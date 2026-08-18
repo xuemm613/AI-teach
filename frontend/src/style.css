@@ -1,0 +1,132 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* 统一色系：主色浅咖 #A67B5B，背景乳白 #FBF6ED，辅助 #EADFCB */
+:root {
+  --el-color-primary: #A67B5B;
+  --el-color-primary-light-3: #b8916f;
+  --el-color-primary-light-5: #c9a78b;
+  --el-color-primary-light-7: #dcbea6;
+  --el-color-primary-light-8: #e6cdb9;
+  --el-color-primary-light-9: #f4ebdd;
+  --el-color-primary-dark-2: #8a6247;
+  --app-bg: #FBF6ED;
+  --aside-start: #A67B5B;
+  --aside-end: #7E5A3F;
+  --card-border: #EADFCB;
+  --head-color: #6E4F38;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  background-color: var(--app-bg);
+}
+
+.layout {
+  height: 100%;
+}
+
+.aside {
+  background: linear-gradient(180deg, var(--aside-start), var(--aside-end));
+  overflow-x: hidden;
+}
+
+.aside .logo {
+  height: 56px;
+  line-height: 56px;
+  color: #fff;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: center;
+  background-color: rgba(255, 255, 255, 0.12);
+  letter-spacing: 1px;
+}
+
+.aside .el-menu {
+  border-right: none;
+  background: transparent;
+}
+
+.aside .el-menu-item {
+  color: #f7efe3;
+}
+
+.aside .el-menu-item:hover,
+.aside .el-menu-item.is-active {
+  background-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.header {
+  background: #fffdf8;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(126, 90, 63, 0.14);
+  z-index: 5;
+}
+
+.header .title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--head-color);
+}
+
+.header .user {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  outline: none;
+}
+
+.page-card {
+  background: #fffdf8;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 10px rgba(126, 90, 63, 0.08);
+  border: 1px solid var(--card-border);
+}
+
+.stat-card {
+  border-radius: 10px;
+  padding: 18px 20px;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-card .num {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.stat-card small {
+  opacity: 0.9;
+}
+
+.markdown-body {
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.markdown-body p { margin: 6px 0; }
+.markdown-body pre { background: #f5efe4; padding: 10px 12px; border-radius: 6px; overflow-x: auto; font-size: 13px; }
+.markdown-body code { background: #f2e9da; padding: 1px 5px; border-radius: 4px; font-family: Consolas, Monaco, monospace; color: #7e5a3f; }
+.markdown-body h1, .markdown-body h2, .markdown-body h3 { margin: 10px 0 6px; color: var(--head-color); }
+.markdown-body ul, .markdown-body ol { padding-left: 22px; }
+.markdown-body li { margin: 3px 0; }
+.markdown-body table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+.markdown-body th, .markdown-body td { border: 1px solid #e2d5be; padding: 6px 10px; text-align: left; }
+.markdown-body th { background: #f4ebdd; font-weight: 600; }
+
+/* 表格与弹窗边框统一 */
+.el-table { --el-table-border-color: #eadfcb; --el-table-header-bg-color: #f4ebdd; }
+.el-dialog { border-radius: 12px; }

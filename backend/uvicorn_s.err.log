@@ -1,0 +1,42 @@
+pymilvus 不可用，将使用本地简易向量存储（LocalVectorStore）
+INFO:     Started server process [10472]
+INFO:     Waiting for application startup.
+2026-08-15 19:57:30,894 [INFO] app.main: MySQL 数据表初始化完成
+2026-08-15 19:57:30,895 [WARNING] app.core.embedding_service: 本地嵌入模型加载失败，降级为哈希向量（可离线运行）: ModuleNotFoundError: No module named 'sentence_transformers'
+2026-08-15 19:57:30,896 [WARNING] app.core.milvus_client: 使用本地简易向量存储 LocalVectorStore（文件: milvus_data.local_store.json）
+2026-08-15 19:57:30,896 [INFO] app.main: Milvus 初始化完成，集合: knowledge_chunks
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+2026-08-15 19:58:31,234 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:58:33,687 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:58:38,710 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:58:41,398 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:58:51,922 [WARNING] app.core.llm: LLM 返回空内容（第 1 次），重试中
+2026-08-15 19:58:53,083 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:03,686 [WARNING] app.core.llm: LLM 返回空内容（第 2 次），重试中
+2026-08-15 19:59:04,844 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:09,343 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:14,569 [WARNING] app.core.llm: LLM 返回空内容（第 1 次），重试中
+2026-08-15 19:59:15,732 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:21,583 [WARNING] app.core.llm: LLM 返回空内容（第 2 次），重试中
+2026-08-15 19:59:22,706 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:27,686 [WARNING] app.core.llm: LLM 返回空内容（第 3 次），重试中
+2026-08-15 19:59:28,700 [WARNING] app.services.agent_service: 工具 query_sql 执行失败: 大模型调用失败：模型返回空内容
+2026-08-15 19:59:28,961 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:34,961 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:35,983 [WARNING] app.services.agent_service: 工具 query_sql 执行失败: not enough values to unpack (expected 2, got 1)
+2026-08-15 19:59:36,119 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:45,896 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 19:59:48,843 [WARNING] app.services.agent_service: 工具 query_sql 执行失败: not enough values to unpack (expected 2, got 0)
+2026-08-15 19:59:49,014 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:00,015 [WARNING] app.core.llm: LLM 返回空内容（第 1 次），重试中
+2026-08-15 20:00:01,171 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:12,859 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:25,861 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:32,502 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:36,430 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:45,323 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:51,624 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:54,736 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:00:59,933 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
+2026-08-15 20:01:03,106 [INFO] httpx: HTTP Request: POST https://api.deepseek.com/chat/completions "HTTP/1.1 200 OK"
