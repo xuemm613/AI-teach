@@ -120,6 +120,30 @@ class LocalVectorStore:
     def count(self) -> int:
         return len(self._rows)
 
+    def has_file_key(self, file_key: str) -> bool:
+        """判断某个 file_key 的分块是否已存在（用于一致性校验）"""
+        with self._lock:
+            return any(
+                str(row.get("metadata", {}).get("file_key", "")) == str(file_key)
+                for row in self._rows
+            )
+
+    def has_file_key(self, file_key: str) -> bool:
+        """判断某个 file_key 的分块是否已存在（用于一致性校验）"""
+        if self.is_fallback():
+            return self._get_fallback().has_file_key(file_key)
+        try:
+            res = self.get_client().query(
+                collection_name=self.collection,
+                filter=f'metadata["file_key"] == "{file_key}"',
+                output_fields=["id"],
+                limit=1,
+            )
+            return bool(res)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("检查文件分块失败: %s", exc)
+            return False
+
     def delete_by_metadata(self, key: str, value: Any) -> int:
         with self._lock:
             before = len(self._rows)

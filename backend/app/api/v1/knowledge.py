@@ -84,6 +84,50 @@ async def _teacher_file_keys(db: AsyncSession, user: User) -> set:
     return set(result.scalars().all())
 
 
+async def _repair_knowledge_files(db: AsyncSession, user: User) -> None:
+    """一致性修复：把数据库中标记为“已入库”但物理文件已丢失的记录标记为失败，
+    避免出现“状态显示已完成却无法检索”的误导情况。"""
+    cond = await _teacher_subject_cond(db, user)
+    stmt = select(KnowledgeFile).where(KnowledgeFile.status == "indexed", *cond)
+    records = (await db.execute(stmt)).scalars().all()
+    changed = False
+    for rec in records:
+        if not Path(rec.file_path).exists():
+            rec.status = "failed"
+            rec.error = "原始文件已丢失，请重新上传"
+            changed = True
+    if changed:
+        await db.commit()
+
+
+async def _reindex_missing_vectors(user_id: Optional[int]) -> None:
+    """后台任务：物理文件仍在、但向量分块缺失的文件重新向量化入库。"""
+    async with async_session_factory() as db:
+        stmt = select(KnowledgeFile).where(KnowledgeFile.status == "indexed")
+        if user_id is not None:
+            stmt = stmt.where(KnowledgeFile.uploaded_by == user_id)
+        records = (await db.execute(stmt)).scalars().all()
+        for rec in records:
+            if not Path(rec.file_path).exists():
+                continue
+            if await run_in_threadpool(milvus_client.has_file_key, rec.file_key):
+                continue
+            try:
+                count = await rag_service.index_file(
+                    rec.file_path,
+                    rec.filename,
+                    file_key=rec.file_key,
+                    subject=rec.subject,
+                    uploader_user_id=rec.uploaded_by,
+                )
+                rec.chunk_count = count
+                rec.error = None
+            except Exception as exc:  # noqa: BLE001
+                rec.status = "failed"
+                rec.error = str(exc)
+            await db.commit()
+
+
 @router.post("/upload")
 async def upload_knowledge(
     background: BackgroundTasks,
@@ -166,6 +210,7 @@ async def knowledge_stats(
 
 @router.get("/files")
 async def list_files(
+    background: BackgroundTasks,
     user: User = Depends(require_roles("admin", "teacher", "student")),
     db: AsyncSession = Depends(get_db),
     status: Optional[str] = Query(None),
@@ -173,6 +218,11 @@ async def list_files(
     page: int = Query(1, ge=1),
     size: int = Query(20, ge=1, le=100),
 ):
+    await _repair_knowledge_files(db, user)
+    if user.role in ("admin", "teacher"):
+        background.add_task(
+            _reindex_missing_vectors, user.id if user.role == "teacher" else None
+        )
     cond = await _teacher_subject_cond(db, user)
     stmt = select(KnowledgeFile).where(*cond)
     if subject:
@@ -249,6 +299,7 @@ async def search_knowledge(
     db: AsyncSession = Depends(get_db),
 ):
     """检索调试接口：返回 Top-K 命中文档（可按科目过滤）。"""
+    await _repair_knowledge_files(db, user)
     hits = await rag_service.retrieve(
         payload.query,
         top_k=payload.top_k,
@@ -281,6 +332,7 @@ async def ask_knowledge(
     db: AsyncSession = Depends(get_db),
 ):
     """RAG 问答：检索知识库并生成带引用来源的回答。教师只能提问自己负责科目的知识库。"""
+    await _repair_knowledge_files(db, user)
     if user.role == "teacher":
         subs = await teacher_subjects(db, user)
         if payload.subject and payload.subject not in subs:
