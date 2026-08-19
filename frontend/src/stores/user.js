@@ -27,7 +27,11 @@ export const useUserStore = defineStore('user', {
       return data
     },
     async register(payload) {
-      return apiRegister(payload)
+      const data = await apiRegister(payload)
+      this.setTokens(data.access_token, data.refresh_token)
+      this.user = data.user
+      localStorage.setItem('user_info', JSON.stringify(data.user))
+      return data
     },
     async fetchMe() {
       const data = await getMe()

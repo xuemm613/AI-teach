@@ -112,7 +112,7 @@ async function genExercise() {
     }
     practiceItem.value = { ...data, id: data.exercise_id || data.id }
   } catch (e) {
-    ElMessage.error('出题失败：' + (e.message || '未知错误'))
+    // 禁答等失败提示已由请求拦截器统一弹出，这里只关闭弹窗
     practiceDialog.value = false
   } finally { practiceLoading.value = false }
 }

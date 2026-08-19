@@ -80,6 +80,11 @@ EXERCISE_GENERATION_PROMPT = """你是出题专家，请围绕知识点生成一
   "difficulty": "难度（easy/medium/hard）"
 }}
 选择题请给出 4 个选项；若为问答题，options 为空数组。
+
+重要规则：如果【知识点】与学习、学科知识无关（如娱乐、闲聊、新闻、生活琐事等），请直接输出以下 JSON，不要生成题目：
+{{"refused": true, "message": "该内容与学习/学科无关，无法生成练习题"}}
+只有知识点与学习相关时才正常出题，且正常出题时不要包含 refused 字段。
+
 【知识点】{knowledge_point}
 【难度】{difficulty}
 """
@@ -151,4 +156,21 @@ PLAN_PATH_PROMPT = """你是学习规划专家，请为以下薄弱知识点制�
 }}
 【薄弱知识点】{weak_points}
 【学生历史表现】{history}
+"""
+
+STUDENT_ANALYSIS_PROMPT = """你是个性化学习辅导专家。请仅根据以下【学生自身学习数据】分析学生的薄弱点并生成个性化辅导方案。
+要求：输出【严格 JSON 对象】（不要输出任何其他文字、注释或 markdown 代码块标记）：
+{{
+  "weakness_diagnosis": "薄弱点诊断（结合错题与知识点）",
+  "learning_path": [{{"stage": "阶段1", "content": "学习内容", "exercises": ["建议练习"]}}],
+  "recommended_exercises": ["推荐练习题或知识点"],
+  "suggestions": ["学习建议1", "学习建议2"]
+}}
+
+【学生信息】姓名：{student_name}　学号：{student_no}　年级：{grade}
+【学习记录】共作答 {total} 题，答对 {correct} 题，正确率约 {accuracy}。
+【错题数】{wrong_count}
+【薄弱知识点】{weak_kps}
+【最近错题明细】
+{wrong_detail}
 """

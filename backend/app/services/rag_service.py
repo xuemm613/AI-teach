@@ -26,7 +26,12 @@ class RAGService:
 
     # ---------- 入库 ----------
     async def index_file(
-        self, file_path: str, filename: str, file_key: Optional[str] = None, subject: Optional[str] = None
+        self,
+        file_path: str,
+        filename: str,
+        file_key: Optional[str] = None,
+        subject: Optional[str] = None,
+        uploader_user_id: Optional[int] = None,
     ) -> int:
         """解析 -> 切分 -> 向量化 -> 存入 Milvus，返回分块数。
 
@@ -41,6 +46,8 @@ class RAGService:
             chunk["metadata"]["file_key"] = file_key or filename
             if subject:
                 chunk["metadata"]["subject"] = subject
+            if uploader_user_id is not None:
+                chunk["metadata"]["uploader_user_id"] = uploader_user_id
         texts = [c["content"] for c in chunks]
         embeddings = await embedding_service.aencode(texts)
         ids = await run_in_threadpool(

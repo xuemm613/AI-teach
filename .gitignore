@@ -10,6 +10,7 @@ backend/milvus_data.db
 backend/uploads/
 uploads/
 *.db
+*.local_store.json
 
 # Node
 node_modules/

@@ -132,6 +132,8 @@ class LLMClient:
         }
         stream = await self._get_client().chat.completions.create(**kwargs)
         async for chunk in stream:
+            if not chunk.choices:
+                continue
             delta = chunk.choices[0].delta
             if delta and delta.content:
                 yield delta.content

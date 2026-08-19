@@ -230,6 +230,8 @@ async def update_me(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    if payload.username is not None:
+        user.username = payload.username
     if payload.full_name is not None:
         user.full_name = payload.full_name
     if payload.email is not None:

@@ -1,10 +1,11 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { getStudentProfile } from '@/api/user'
 
 const route = useRoute()
+const router = useRouter()
 const profile = ref(null)
 const loading = ref(true)
 let radar = null
@@ -57,6 +58,9 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dis
 <template>
   <div v-loading="loading">
     <template v-if="profile">
+      <div style="margin-bottom: 12px">
+        <el-button @click="router.back()">← 返回班级</el-button>
+      </div>
       <el-row :gutter="16">
         <el-col :span="8">
           <div class="page-card">
@@ -88,7 +92,7 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dis
             <h3 style="margin-bottom: 12px">错题历史（{{ profile.wrong_history.length }}）</h3>
             <div v-for="w in profile.wrong_history" :key="w.id" class="wrong-item">
               <div class="w-title">{{ w.exercise.content }}</div>
-              <div class="w-meta">正确答案：{{ w.exercise.answer }}　错因：{{ w.reason || '未分析' }}</div>
+              <div class="w-meta">正确答案：{{ w.exercise.answer }}</div>
             </div>
             <el-empty v-if="!profile.wrong_history.length" description="暂无错题" :image-size="60" />
           </div>

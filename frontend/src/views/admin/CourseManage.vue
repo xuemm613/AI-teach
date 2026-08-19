@@ -34,15 +34,17 @@ function emptyRow() {
 }
 
 async function loadClasses() {
-  classes.value = await listClasses()
-  teachers.value = await listTeachers()
-  overview.value = await getTimetableOverview()
+  try { classes.value = await listClasses() } catch (e) { classes.value = [] }
+  try { teachers.value = await listTeachers() } catch (e) { teachers.value = [] }
+  try { overview.value = await getTimetableOverview() } catch (e) { overview.value = [] }
 }
 
 async function loadTimetable() {
   if (!classId.value) { ElMessage.warning('请先选择班级'); return }
   loading.value = true
   try {
+    // 刷新冲突总览，保证下拉中已占用老师的标记始终是最新的
+    overview.value = await getTimetableOverview().catch(() => overview.value)
     const data = await request.get(`/admin/classes/${classId.value}/timetable`).then((r) => r.data)
     cells.value = (data.cells || []).map((row) =>
       row.map((c) => ({ subject: c.subject || '', teacher_user_id: c.teacher_user_id || null }))
@@ -58,13 +60,13 @@ function currentPeriod() { return (cellPos.value?.period || 0) + 1 }
 
 // 该时段已占用（在其它班级上课）的老师 id 集合
 const busyTeacherIds = computed(() => {
-  if (!cellPos.value) return new Set()
+  if (!cellPos.value || !Array.isArray(overview.value)) return new Set()
   const w = currentWeekday()
   const p = currentPeriod()
   const busy = new Set()
   for (const item of overview.value) {
     if (item.class_id !== classId.value && item.weekday === w && item.period === p && item.teacher_user_id) {
-      busy.add(item.teacher_user_id)
+      busy.add(String(item.teacher_user_id))
     }
   }
   return busy
@@ -77,7 +79,7 @@ const teacherOptions = computed(() => {
 })
 
 function teacherName(id) {
-  const t = teachers.value.find((x) => x.user_id === id)
+  const t = teachers.value.find((x) => String(x.user_id) === String(id))
   return t ? (t.full_name || t.username) : id
 }
 
@@ -86,11 +88,11 @@ function onTeacherChange(tid) {
   if (!tid) return
   const w = currentWeekday()
   const p = currentPeriod()
-  const conflict = overview.value.find(
-    (item) => item.class_id !== classId.value && item.weekday === w && item.period === p && item.teacher_user_id === tid
+  const conflict = (overview.value || []).find(
+    (item) => item.class_id !== classId.value && item.weekday === w && item.period === p && String(item.teacher_user_id) === String(tid)
   )
   if (conflict) {
-    const t = teachers.value.find((x) => x.user_id === tid)
+    const t = teachers.value.find((x) => String(x.user_id) === String(tid))
     ElMessage.error(`老师「${t?.full_name || t?.username || tid}」该时段已在班级「${conflict.class_name}」上课，请选择其他老师`)
     cellForm.value.teacher_user_id = null
   }
@@ -101,6 +103,8 @@ function openCell(periodIdx, weekdayIdx) {
   cellPos.value = { period: periodIdx, weekday: weekdayIdx }
   cellForm.value = { subject: cell.subject, teacher_user_id: cell.teacher_user_id || null }
   cellDialog.value = true
+  // 后台刷新冲突总览（请求完成后回填数组，避免把 Promise 赋给 overview）
+  getTimetableOverview().then((data) => { overview.value = data || [] }).catch(() => {})
 }
 
 function saveCell() {
@@ -109,7 +113,7 @@ function saveCell() {
     ElMessage.warning('请选择上课老师')
     return
   }
-  if (cellForm.value.teacher_user_id && busyTeacherIds.value.has(cellForm.value.teacher_user_id)) {
+  if (cellForm.value.teacher_user_id && busyTeacherIds.value.has(String(cellForm.value.teacher_user_id))) {
     ElMessage.error('该老师该时段已在其他班级上课，请更换老师')
     return
   }
@@ -125,14 +129,12 @@ async function save() {
   if (!classId.value) return
   saving.value = true
   try {
-    const res = await request.put(`/admin/classes/${classId.value}/timetable`, { cells: cells.value, periods, weekdays }).then((r) => r.data)
-    if (res.code === 0) {
-      ElMessage.success(res.message || '课表已保存')
-      overview.value = await getTimetableOverview()   // 刷新冲突总览
-      await loadTimetable()
-    } else {
-      ElMessage.warning(res.message || '保存失败')
-    }
+    const res = await request.put(`/admin/classes/${classId.value}/timetable`, { cells: cells.value, periods, weekdays })
+    ElMessage.success(res.message || '课表已保存')
+    await loadTimetable()   // loadTimetable 会一并刷新冲突总览
+  } catch (e) {
+    // 保存失败（如冲突）时刷新总览，让下拉即时显示已占用老师
+    overview.value = await getTimetableOverview().catch(() => overview.value)
   } finally { saving.value = false }
 }
 
@@ -191,9 +193,9 @@ onMounted(async () => {
             <el-option
               v-for="t in teacherOptions"
               :key="t.user_id"
-              :label="`${t.full_name || t.username}${busyTeacherIds.has(t.user_id) ? '（该时段已在其他班上课）' : ''}`"
+              :label="`${t.full_name || t.username}${busyTeacherIds.has(String(t.user_id)) ? '（该时段已在其他班上课）' : ''}`"
               :value="t.user_id"
-              :disabled="busyTeacherIds.has(t.user_id)"
+              :disabled="busyTeacherIds.has(String(t.user_id))"
             />
           </el-select>
         </el-form-item>

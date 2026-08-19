@@ -2,8 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/stores/user'
-import { askKnowledge, deleteFile, listFiles, uploadFile } from '@/api/knowledge'
-import CitationList from '@/components/CitationList.vue'
+import { askKnowledge, deleteFile, getFileContent, listFiles, uploadFile } from '@/api/knowledge'
 import MarkdownView from '@/components/MarkdownView.vue'
 
 const userStore = useUserStore()
@@ -19,8 +18,27 @@ const statusType = { pending: 'info', processing: 'warning', indexed: 'success',
 // ---- RAG 问答 ----
 const qaQuestion = ref('')
 const qaAnswer = ref('')
-const qaSources = ref([])
 const qaAsking = ref(false)
+
+// ---- 查看文件内容 ----
+const contentDialog = ref(false)
+const contentLoading = ref(false)
+const currentFileName = ref('')
+const currentContent = ref('')
+
+async function viewContent(row) {
+  contentLoading.value = true
+  currentFileName.value = row.filename
+  try {
+    const data = await getFileContent(row.id)
+    currentContent.value = data.content || '（文件内容为空或暂不可解析）'
+    contentDialog.value = true
+  } catch (e) {
+    ElMessage.error('文件内容加载失败：' + (e.message || '未知错误'))
+  } finally {
+    contentLoading.value = false
+  }
+}
 
 let pollTimer = null
 
@@ -73,7 +91,6 @@ async function doAsk() {
   try {
     const res = await askKnowledge({ question: qaQuestion.value.trim(), subject: subject.value || null })
     qaAnswer.value = res.answer
-    qaSources.value = res.sources || []
   } finally { qaAsking.value = false }
 }
 
@@ -107,7 +124,12 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
               <el-tag v-else :type="statusType[row.status]">{{ statusMap[row.status] }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="80"><template #default="{ row }"><el-button type="danger" link @click="remove(row.id)">删除</el-button></template></el-table-column>
+          <el-table-column label="操作" width="130">
+            <template #default="{ row }">
+              <el-button type="primary" link @click="viewContent(row)">查看</el-button>
+              <el-button type="danger" link @click="remove(row.id)">删除</el-button>
+            </template>
+          </el-table-column>
         </el-table>
         <el-empty v-if="!files.length" description="暂无文件" />
       </div>
@@ -121,15 +143,21 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
           <div class="qa-box">
             <MarkdownView :content="qaAnswer" />
           </div>
-          <CitationList v-if="qaSources && qaSources.length" :sources="qaSources" />
         </template>
         <el-empty v-else description="上传文件后，在此提问知识库内容" :image-size="60" />
       </div>
     </el-col>
   </el-row>
+
+  <el-dialog v-model="contentDialog" :title="currentFileName" width="720px">
+    <div v-loading="contentLoading" class="content-box">
+      <pre>{{ currentContent }}</pre>
+    </div>
+  </el-dialog>
 </template>
 
 <style scoped>
 .gray { color: #909399; font-size: 12px; }
 .qa-box { margin-top: 14px; padding: 12px; background: #fbf6ed; border: 1px solid #eadfcb; border-radius: 8px; }
+.content-box pre { white-space: pre-wrap; word-break: break-all; font-size: 13px; line-height: 1.7; max-height: 60vh; overflow-y: auto; }
 </style>

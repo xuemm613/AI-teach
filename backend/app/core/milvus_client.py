@@ -87,16 +87,24 @@ class LocalVectorStore:
             self._save()
         return ids
 
+    @staticmethod
+    def _match_expr(row: Dict[str, Any], expr: str) -> bool:
+        """按 metadata 过滤表达式判断是否命中（支持 条件 and 条件 组合）"""
+        for cond in expr.split(" and "):
+            m = re.match(r'metadata\["([^"]+)"\]\s*==\s*"?([^"]*)"?', cond.strip())
+            if not m:
+                continue
+            key, value = m.group(1), m.group(2)
+            if str(row.get("metadata", {}).get(key, "")) != str(value):
+                return False
+        return True
+
     def search(self, vector, top_k, expr=None) -> List[Dict[str, Any]]:
         with self._lock:
             scored = []
             for row in self._rows:
-                if expr:
-                    m = re.match(r'metadata\["([^"]+)"\]\s*==\s*"?([^"]*)"?', expr)
-                    if m:
-                        key, value = m.group(1), m.group(2)
-                        if str(row.get("metadata", {}).get(key, "")) != str(value):
-                            continue
+                if expr and not self._match_expr(row, expr):
+                    continue
                 scored.append((_cosine(vector, row["embedding"]), row))
             scored.sort(key=lambda t: t[0], reverse=True)
             return [

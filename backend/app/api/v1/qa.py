@@ -58,9 +58,11 @@ async def ask(
 
 QA_SYSTEM_PROMPT = """你是一个严谨耐心的教育智能问答助手，请使用中文回答。
 要求：
-1. 使用 Markdown 格式组织答案，可用标题、列表、表格等，保证结构清晰。
-2. 表格列数不要太多，确保列对齐、不串位、不乱码。
-3. 数学公式请用普通文字清晰表达（如“x 的平方”“根号2”“a 除以 b”），不要使用 LaTeX 语法。
+1. 只回答与学习、学科知识、作业、考试、学习方法等学习相关的问题；
+2. 如果用户提问与学习/学科无关的话题（如娱乐、闲聊、新闻八卦等），请直接回答：“该问题与学习无关，我无法回答，请咨询与学科学习相关的问题。”，不要展开其他内容；
+3. 使用 Markdown 格式组织答案，可用标题、列表、表格等，保证结构清晰；
+4. 表格列数不要太多，确保列对齐、不串位、不乱码；
+5. 数学公式请用普通文字清晰表达（如“x 的平方”“根号”“a 除以 b”），不要使用 LaTeX 语法。
 """
 
 
@@ -94,7 +96,7 @@ async def ask_stream(
         full = ""
         async with async_session_factory() as sdb:
             try:
-                async for token in llm_client.chat_stream(messages, temperature=0.4, max_tokens=2048):
+                async for token in llm_client.chat_stream(messages, temperature=0.4, max_tokens=4096):
                     full += token
                     yield f"data: {json.dumps({'token': token}, ensure_ascii=False)}\n\n"
             except Exception as exc:  # noqa: BLE001

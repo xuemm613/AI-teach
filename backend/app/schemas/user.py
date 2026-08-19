@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class UserUpdate(BaseModel):
+    username: Optional[str] = Field(default=None, min_length=2, max_length=64)
     full_name: Optional[str] = Field(default=None, max_length=64)
     email: Optional[str] = Field(default=None, max_length=128)
     avatar: Optional[str] = Field(default=None, max_length=255)

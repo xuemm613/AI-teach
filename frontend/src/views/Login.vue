@@ -26,7 +26,8 @@ const form = reactive({
 
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, min: 6, message: '请输入至少 6 位密码', trigger: 'blur' }]
+  password: [{ required: true, min: 6, message: '请输入至少 6 位密码', trigger: 'blur' }],
+  full_name: [{ required: true, message: '请输入姓名', trigger: 'blur' }]
 }
 
 async function submit() {
@@ -39,9 +40,8 @@ async function submit() {
       router.push('/')   // 由路由守卫跳转到对应角色首页（管理员→数据看板）
     } else {
       await store.register({ ...form })
-      ElMessage.success('注册成功，请登录')
-      mode.value = 'login'
-      form.password = ''
+      ElMessage.success('注册成功')
+      router.push('/')
     }
   } finally {
     loading.value = false
@@ -63,7 +63,7 @@ async function submit() {
       </el-tabs>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" size="large" @keyup.enter="submit">
-        <el-form-item label="用户名 / 工号 / 学号" prop="username">
+        <el-form-item label="工号/学号" prop="username">
           <el-input v-model="form.username" />
         </el-form-item>
         <el-form-item label="密码" prop="password">
@@ -77,7 +77,7 @@ async function submit() {
               <el-radio-button value="teacher">教师</el-radio-button>
             </el-radio-group>
           </el-form-item>
-          <el-form-item label="姓名">
+          <el-form-item label="姓名" prop="full_name">
             <el-input v-model="form.full_name" />
           </el-form-item>
           <el-form-item label="邮箱">

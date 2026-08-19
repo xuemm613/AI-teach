@@ -33,9 +33,17 @@ async function genPlan() {
   try {
     const task = await myAnalysis()
     if (task.status === 'completed') {
-      plan.value = task.output || {}
-      planDate.value = task.created_at || ''
-      ElMessage.success('个性化方案已生成')
+      const output = task.output || {}
+      if (output.message) {
+        // 无学习记录：仅弹出提示，页面保持空状态
+        plan.value = null
+        planDate.value = ''
+        ElMessage.warning(output.message)
+      } else {
+        plan.value = output
+        planDate.value = task.created_at || ''
+        ElMessage.success('个性化方案已生成')
+      }
     } else {
       ElMessage.warning('方案生成未完成：' + (task.error || '未知原因'))
     }
@@ -54,6 +62,8 @@ async function loadLatestPlan() {
   try {
     const task = await myAnalysisLatest()
     if (task && task.status === 'completed' && task.output) {
+      // 无学习记录的提示不作为方案展示，页面保持空状态
+      if (task.output.message) return
       plan.value = task.output
       planDate.value = task.created_at || ''
     }
@@ -128,12 +138,63 @@ const typeMeta = {
   collect: { label: '收藏错题', color: '#a67b5b' }
 }
 
+// 错题本查看原题与正确答案
+const wrongDialog = ref(false)
+const currentWrong = ref(null)
+function viewWrong(row) {
+  currentWrong.value = row
+  wrongDialog.value = true
+}
+
+// 语音朗读生成的辅导方案
+const speaking = ref(false)
+
+function planToText() {
+  if (!plan.value) return ''
+  if (plan.value.message) return plan.value.message
+  const parts = []
+  if (plan.value.weakness_diagnosis) parts.push('薄弱点诊断：' + plan.value.weakness_diagnosis)
+  const path = plan.value.learning_path || []
+  if (path.length) {
+    parts.push('学习路径：')
+    path.forEach((st, i) => {
+      let item = (i + 1) + '、' + (st.stage || '') + '：' + (st.content || '')
+      if (st.exercises && st.exercises.length) item += '，建议练习：' + st.exercises.join('、')
+      parts.push(item)
+    })
+  }
+  const recs = plan.value.recommended_exercises || []
+  if (recs.length) parts.push('推荐练习：' + recs.join('、'))
+  const sugs = plan.value.suggestions || []
+  if (sugs.length) parts.push('学习建议：' + sugs.join('、'))
+  return parts.join('。')
+}
+
+function speakPlan() {
+  if (!plan.value) { ElMessage.warning('请先生成辅导方案'); return }
+  if (!('speechSynthesis' in window)) { ElMessage.warning('当前浏览器不支持语音朗读'); return }
+  if (speaking.value) {
+    window.speechSynthesis.cancel()
+    speaking.value = false
+    return
+  }
+  const text = planToText()
+  if (!text) { ElMessage.warning('暂无可以朗读的内容'); return }
+  const utter = new SpeechSynthesisUtterance(text)
+  utter.lang = 'zh-CN'
+  utter.rate = 1
+  utter.onend = () => { speaking.value = false }
+  utter.onerror = () => { speaking.value = false }
+  window.speechSynthesis.speak(utter)
+  speaking.value = true
+}
+
 onMounted(() => {
   loadStats().catch((e) => console.warn('学习统计加载失败', e))
   loadLatestPlan()
   window.addEventListener('resize', resize)
 })
-onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dispose(); activity?.dispose() })
+onBeforeUnmount(() => { if ('speechSynthesis' in window) window.speechSynthesis.cancel(); window.removeEventListener('resize', resize); radar?.dispose(); activity?.dispose() })
 </script>
 
 <template>
@@ -143,7 +204,12 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dis
         <div>
           <h3>个性化学习辅导（AI Agent）</h3>
         </div>
-        <el-button type="primary" size="large" :loading="generating" @click="genPlan">生成我的辅导方案</el-button>
+        <div style="display:flex; gap:10px">
+          <el-button size="large" :type="speaking ? 'warning' : 'default'" :disabled="!plan" @click="speakPlan">
+            {{ speaking ? '停止朗读' : '🔊 语音朗读' }}
+          </el-button>
+          <el-button type="primary" size="large" :loading="generating" @click="genPlan">生成我的辅导方案</el-button>
+        </div>
       </div>
 
       <div v-loading="planLoading" style="margin-top: 16px">
@@ -200,13 +266,31 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dis
                 <el-tag v-for="kp in row.exercise.knowledge_points || []" :key="kp" size="small" type="info" style="margin-right:4px">{{ kp }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="正确答案" width="140"><template #default="{ row }">{{ row.exercise.answer }}</template></el-table-column>
             <el-table-column label="加入时间" width="170"><template #default="{ row }">{{ fmtTime(row.created_at) }}</template></el-table-column>
-            <el-table-column label="操作" width="120">
-              <template #default="{ row }"><el-button type="danger" link @click="removeWrong(row.id)">已掌握/删除</el-button></template>
+            <el-table-column label="操作" width="150">
+              <template #default="{ row }">
+                <el-button type="primary" link @click="viewWrong(row)">查看原题</el-button>
+                <el-button type="danger" link @click="removeWrong(row.id)">删除</el-button>
+              </template>
             </el-table-column>
           </el-table>
           <el-empty v-if="!wrongItems.length" description="暂无错题，继续保持！" />
+
+          <el-dialog v-model="wrongDialog" title="原题与正确答案" width="640px">
+            <template v-if="currentWrong">
+              <div class="wrong-detail">
+                <p><b>题目：</b>{{ currentWrong.exercise.content }}</p>
+                <p v-if="(currentWrong.exercise.options || []).length"><b>选项：</b>{{ currentWrong.exercise.options.map((o) => o.key + '. ' + o.text).join('　') }}</p>
+                <p><b>正确答案：</b>{{ currentWrong.exercise.answer }}</p>
+                <p v-if="currentWrong.exercise.analysis"><b>解析：</b>{{ currentWrong.exercise.analysis }}</p>
+                <p v-if="currentWrong.reason"><b>错因：</b>{{ currentWrong.reason }}</p>
+                <div style="margin-top: 10px">
+                  <el-tag v-for="kp in currentWrong.exercise.knowledge_points || []" :key="kp" size="small" type="info" style="margin-right:4px">{{ kp }}</el-tag>
+                </div>
+              </div>
+            </template>
+            <template #footer><el-button @click="wrongDialog = false">关闭</el-button></template>
+          </el-dialog>
         </el-tab-pane>
 
         <el-tab-pane label="学习记录" name="records">
@@ -239,4 +323,5 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dis
 .plan-section h4 { margin-bottom: 6px; color: #7e5a3f; }
 .plan-section ul { padding-left: 22px; }
 .plan-section li { margin: 3px 0; }
+.wrong-detail p { line-height: 1.7; margin: 6px 0; }
 </style>

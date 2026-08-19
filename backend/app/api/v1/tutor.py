@@ -1,7 +1,7 @@
 """个性化学习 Agent 接口。"""
 import json
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,8 +23,8 @@ from app.schemas.tutor import (
     ExerciseGenRequest,
     SqlQueryRequest,
 )
-from app.services.agent_service import TutorTools, agent_service
-from app.utils.prompt_templates import EXERCISE_GENERATION_PROMPT
+from app.services.agent_service import TutorTools
+from app.utils.prompt_templates import EXERCISE_GENERATION_PROMPT, STUDENT_ANALYSIS_PROMPT
 
 router = APIRouter(prefix="/tutor", tags=["个性化辅导"])
 
@@ -90,7 +90,8 @@ async def my_analysis(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """学生个人学情分析：由个性化学习 Agent 根据答题/错题/学习记录生成辅导方案。"""
+    """学生个人学情分析：仅拉取学生自身的学习记录、错题本、薄弱知识点生成方案；
+    若没有任何学习记录，则直接提示学习活动太少，不检索其他数据。"""
     if user.role != "student":
         return fail("仅学生可生成个人学情分析")
     student = (
@@ -99,43 +100,105 @@ async def my_analysis(
     if student is None:
         return fail("学生资料不存在")
 
-    # 最近错题
-    wrong_ids = (
+    # 最近错题（仅学生自己的错题本，带题目内容）
+    wrong_rows = (
         await db.execute(
-            select(WrongBook.exercise_id)
+            select(WrongBook, Exercise)
+            .join(Exercise, Exercise.id == WrongBook.exercise_id)
             .where(WrongBook.student_id == student.id)
             .order_by(WrongBook.created_at.desc())
             .limit(10)
         )
-    ).scalars().all()
+    ).all()
+    wrong_exercises = [
+        {
+            "content": (ex.content or "")[:200],
+            "answer": (ex.answer or "")[:200],
+            "knowledge_points": ex.knowledge_points or [],
+            "reason": wb.reason or "",
+        }
+        for wb, ex in wrong_rows
+    ]
 
-    # 薄弱知识点：从最近答错的题目中统计
-    kp_counter = {}
-    rows = (
+    # 学习记录统计（仅学生自己的作答记录）
+    record_rows = (
         await db.execute(
-            select(Exercise.knowledge_points)
-            .join(LearningRecord, LearningRecord.exercise_id == Exercise.id)
-            .where(
-                LearningRecord.student_id == student.id,
-                LearningRecord.is_correct.is_(False),
-            )
+            select(LearningRecord, Exercise)
+            .join(Exercise, Exercise.id == LearningRecord.exercise_id)
+            .where(LearningRecord.student_id == student.id)
             .order_by(LearningRecord.created_at.desc())
-            .limit(30)
+            .limit(50)
         )
     ).all()
-    for (kps,) in rows:
-        for kp in kps or []:
-            kp_counter[kp] = kp_counter.get(kp, 0) + 1
+    total = len(record_rows)
+    correct = sum(1 for rec, _ in record_rows if rec.is_correct)
+
+    # 薄弱知识点：从该学生最近答错的题目中统计
+    kp_counter = {}
+    for rec, ex in record_rows:
+        if not rec.is_correct:
+            for kp in ex.knowledge_points or []:
+                kp_counter[kp] = kp_counter.get(kp, 0) + 1
     weak_kps = sorted(kp_counter, key=lambda k: kp_counter[k], reverse=True)[:6]
 
-    problems = "请根据我的答题情况、错题与学习记录，分析我的薄弱点并生成个性化学习辅导方案。"
-    task = await agent_service.run_agent(
-        db=db,
-        user=user,
-        problems=problems,
-        wrong_exercise_ids=list(wrong_ids),
-        knowledge_points=weak_kps,
+    # 没有任何学习记录：直接返回提示，不调用大模型/检索，避免拉到无关数据
+    if total == 0 and not wrong_exercises:
+        task = AgentTask(
+            user_id=user.id,
+            student_id=student.id,
+            task_type="personalized_plan",
+            input_data={"message": "无学习记录"},
+            output={"message": "您的学习活动太少，请开始学习吧"},
+            status="completed",
+        )
+        db.add(task)
+        await db.commit()
+        await db.refresh(task)
+        return ok(task_to_dict(task), message="学情分析完成")
+
+    # 有学习数据：仅使用学生自身数据直接调用大模型生成 JSON 方案
+    accuracy = correct / total if total else 0.0
+    wrong_detail = "\n".join(
+        "- 题目：%s 知识点：%s" % (
+            w["content"],
+            "、".join(w["knowledge_points"]) if w["knowledge_points"] else "（无）",
+        )
+        for w in wrong_exercises
+    ) or "（无）"
+    prompt = STUDENT_ANALYSIS_PROMPT.format(
+        student_name=user.full_name or user.username,
+        student_no=student.student_no or "-",
+        grade=student.grade or "-",
+        total=total,
+        correct=correct,
+        accuracy="%.1f%%" % (accuracy * 100),
+        wrong_count=len(wrong_exercises),
+        weak_kps="、".join(weak_kps) if weak_kps else "（暂无明显薄弱知识点）",
+        wrong_detail=wrong_detail,
     )
+    try:
+        output = await llm_client.chat_json(
+            [{"role": "system", "content": prompt}], temperature=0.4, max_tokens=2048
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail="方案生成失败：%s" % exc)
+    if not isinstance(output, dict):
+        output = {"weakness_diagnosis": str(output)}
+
+    task = AgentTask(
+        user_id=user.id,
+        student_id=student.id,
+        task_type="personalized_plan",
+        input_data={
+            "wrong_exercise_ids": [wb.id for wb, _ in wrong_rows],
+            "knowledge_points": weak_kps,
+        },
+        output=output,
+        status="completed",
+    )
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
     return ok(task_to_dict(task), message="学情分析完成")
 
 
@@ -152,6 +215,9 @@ async def generate_exercise(
     data = await llm_client.chat_json(
         [{"role": "system", "content": prompt}], temperature=0.6, max_tokens=1024
     )
+    # 与学习/学科无关的知识点：发出禁答提示
+    if data.get("refused"):
+        return fail(data.get("message") or "该内容与学习/学科无关，无法生成练习题")
     # 确定题目所属课程：优先用传入的 course_id；否则按科目查找/创建课程，
     # 保证题库管理里“科目”与“知识点”正确对应
     course_id = payload.course_id

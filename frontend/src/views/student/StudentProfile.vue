@@ -10,13 +10,14 @@ const router = useRouter()
 const userStore = useUserStore()
 const classes = ref([])
 const formRef = ref()
-const form = reactive({ full_name: '', email: '', password: '' })
+const form = reactive({ username: '', full_name: '', email: '', password: '' })
 const avatarUploading = ref(false)
 
 async function load() {
   const me = await getMe()
   userStore.user = me
   localStorage.setItem('user_info', JSON.stringify(me))
+  form.username = me.username || ''
   form.full_name = me.full_name || ''
   form.email = me.email || ''
   classes.value = await getClassInfo()
@@ -36,7 +37,7 @@ async function customAvatar({ file, onSuccess, onError }) {
 }
 
 async function save() {
-  const payload = { full_name: form.full_name || undefined, email: form.email || undefined }
+  const payload = { username: form.username || undefined, full_name: form.full_name || undefined, email: form.email || undefined }
   if (form.password) payload.password = form.password
   await updateMe(payload)
   ElMessage.success('保存成功')
@@ -65,7 +66,7 @@ onMounted(load)
         </div>
         <el-form ref="formRef" :model="form" label-width="80px">
           <el-form-item label="学号"><el-input :model-value="userStore.user?.student_no || '-'" disabled /></el-form-item>
-          <el-form-item label="用户名"><el-input :model-value="userStore.user?.username" disabled /></el-form-item>
+          <el-form-item label="用户名"><el-input v-model="form.username" /></el-form-item>
           <el-form-item label="姓名"><el-input v-model="form.full_name" /></el-form-item>
           <el-form-item label="邮箱"><el-input v-model="form.email" /></el-form-item>
           <el-form-item label="新密码"><el-input v-model="form.password" type="password" show-password  /></el-form-item>

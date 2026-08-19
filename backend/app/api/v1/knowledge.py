@@ -19,7 +19,7 @@ from app.models.models import KnowledgeFile, User
 from app.schemas.common import fail, ok
 from app.schemas.knowledge import KnowledgeAskRequest, SearchRequest
 from app.services.rag_service import rag_service
-from app.utils.document_parser import SUPPORTED_EXTS
+from app.utils.document_parser import SUPPORTED_EXTS, parse_document
 from app.utils.prompt_templates import RAG_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ async def _process_upload(file_id: int) -> None:
                 record.filename,
                 file_key=record.file_key,
                 subject=record.subject,
+                uploader_user_id=record.uploaded_by,
             )
             record.status = "indexed"
             record.chunk_count = count
@@ -71,8 +72,16 @@ async def _teacher_subject_cond(db: AsyncSession, user: User) -> List:
         subs = await teacher_subjects(db, user)
         if not subs:
             return [KnowledgeFile.id < 0]
-        return [KnowledgeFile.subject.in_(list(subs))]
+        return [KnowledgeFile.subject.in_(list(subs)), KnowledgeFile.uploaded_by == user.id]
     return []
+
+
+async def _teacher_file_keys(db: AsyncSession, user: User) -> set:
+    """返回该教师自己上传的所有文件 key（以数据库为准，兼容历史上传的旧向量）"""
+    result = await db.execute(
+        select(KnowledgeFile.file_key).where(KnowledgeFile.uploaded_by == user.id)
+    )
+    return set(result.scalars().all())
 
 
 @router.post("/upload")
@@ -185,11 +194,29 @@ async def file_detail(
     record = await db.get(KnowledgeFile, file_id)
     if record is None:
         raise HTTPException(status_code=404, detail="文件记录不存在")
-    if user.role == "teacher":
-        subs = await teacher_subjects(db, user)
-        if record.subject not in subs:
-            raise HTTPException(status_code=403, detail="无权查看其他科目的文件")
+    if user.role == "teacher" and record.uploaded_by != user.id:
+        raise HTTPException(status_code=403, detail="无权查看其他教师的文件")
     return ok(_file_to_dict(record))
+
+
+@router.get("/files/{file_id}/content")
+async def file_content(
+    file_id: int,
+    user: User = Depends(require_roles("admin", "teacher")),
+    db: AsyncSession = Depends(get_db),
+):
+    """查看文件内容：解析物理文件并返回纯文本（教师仅能查看自己上传的文件）"""
+    record = await db.get(KnowledgeFile, file_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="文件记录不存在")
+    if user.role == "teacher" and record.uploaded_by != user.id:
+        raise HTTPException(status_code=403, detail="无权查看其他教师的文件")
+    try:
+        pages = await run_in_threadpool(parse_document, record.file_path, record.filename)
+        text = "\n\n".join(pg.text for pg in pages)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail="文件内容解析失败：%s" % exc)
+    return ok({"filename": record.filename, "content": text})
 
 
 @router.delete("/files/{file_id}")
@@ -201,10 +228,8 @@ async def delete_file(
     record = await db.get(KnowledgeFile, file_id)
     if record is None:
         raise HTTPException(status_code=404, detail="文件记录不存在")
-    if user.role == "teacher":
-        subs = await teacher_subjects(db, user)
-        if record.subject not in subs:
-            raise HTTPException(status_code=403, detail="无权删除其他科目的文件")
+    if user.role == "teacher" and record.uploaded_by != user.id:
+        raise HTTPException(status_code=403, detail="无权删除其他教师的文件")
 
     await run_in_threadpool(milvus_client.delete_by_metadata, "file_key", record.file_key)
     try:
@@ -221,9 +246,17 @@ async def delete_file(
 async def search_knowledge(
     payload: SearchRequest,
     user: User = Depends(require_roles("admin", "teacher", "student")),
+    db: AsyncSession = Depends(get_db),
 ):
     """检索调试接口：返回 Top-K 命中文档（可按科目过滤）。"""
-    hits = await rag_service.retrieve(payload.query, top_k=payload.top_k, subject=payload.subject)
+    hits = await rag_service.retrieve(
+        payload.query,
+        top_k=payload.top_k,
+        subject=payload.subject,
+    )
+    if user.role == "teacher":
+        own_keys = await _teacher_file_keys(db, user)
+        hits = [h for h in hits if h["metadata"].get("file_key") in own_keys]
     return ok(
         {
             "query": payload.query,
@@ -254,8 +287,13 @@ async def ask_knowledge(
             return fail(f"只能提问您负责科目的知识库：{', '.join(sorted(subs)) or '未分配科目'}")
 
     hits = await rag_service.retrieve(
-        payload.question, top_k=settings.RAG_TOP_K, subject=payload.subject or None
+        payload.question,
+        top_k=settings.RAG_TOP_K,
+        subject=payload.subject or None,
     )
+    if user.role == "teacher":
+        own_keys = await _teacher_file_keys(db, user)
+        hits = [h for h in hits if h["metadata"].get("file_key") in own_keys]
     if not hits:
         return ok({"answer": "知识库中暂无相关信息，请先上传相关文件后再提问。", "sources": []})
     # 有命中时即结合资料回答；若资料不足以回答，提示词会要求模型明确说明“知识库中暂无相关信息”

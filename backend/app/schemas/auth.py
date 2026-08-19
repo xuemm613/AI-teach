@@ -8,7 +8,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(min_length=2, max_length=64, description="用户名")
     password: str = Field(min_length=6, max_length=64, description="密码")
     role: str = Field(default="student", pattern="^(student|teacher)$", description="角色")
-    full_name: Optional[str] = Field(default=None, max_length=64)
+    full_name: str = Field(min_length=1, max_length=64, description="姓名（必填）")
     email: Optional[str] = Field(default=None, max_length=128)
     grade: Optional[str] = Field(default=None, description="学生年级（下拉选择）")
     subject: Optional[str] = Field(default=None, description="教师学科（单选）")
