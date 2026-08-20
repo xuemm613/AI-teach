@@ -108,7 +108,7 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
         </div>
 
         <el-upload drag multiple :show-file-list="false" :http-request="customUpload" accept=".pdf,.docx,.txt,.md" style="margin-bottom: 16px">
-          <el-icon size="40" color="#a67b5b"><UploadFilled /></el-icon>
+          <el-icon size="40" color="#2F6FED"><UploadFilled /></el-icon>
           <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
         </el-upload>
 
@@ -158,6 +158,6 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 
 <style scoped>
 .gray { color: #909399; font-size: 12px; }
-.qa-box { margin-top: 14px; padding: 12px; background: #fbf6ed; border: 1px solid #eadfcb; border-radius: 8px; }
+.qa-box { margin-top: 14px; padding: 12px; background: #F4F6F9; border: 1px solid #D0D5DD; border-radius: 8px; }
 .content-box pre { white-space: pre-wrap; word-break: break-all; font-size: 13px; line-height: 1.7; max-height: 60vh; overflow-y: auto; }
 </style>

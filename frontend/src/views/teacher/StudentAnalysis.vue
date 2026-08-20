@@ -116,7 +116,7 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dis
 </template>
 
 <style scoped>
-.wrong-item { padding: 8px 0; border-bottom: 1px solid #f5efe6; }
+.wrong-item { padding: 8px 0; border-bottom: 1px solid #DEE3EA; }
 .w-title { font-size: 14px; }
 .w-meta { color: #909399; font-size: 12px; margin-top: 2px; }
 </style>

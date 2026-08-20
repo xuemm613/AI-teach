@@ -8,7 +8,7 @@ const data = ref({ user: {}, today_schedule: [] })
 const loading = ref(true)
 
 const quickLinks = [
-  { path: '/teacher/lesson', title: '智能备课', desc: 'AI 一键生成完整教案', icon: 'Document', color: '#a67b5b' },
+  { path: '/teacher/lesson', title: '智能备课', desc: 'AI 一键生成完整教案', icon: 'Document', color: '#2F6FED' },
   { path: '/teacher/knowledge', title: '知识点检索/知识库', desc: '上传教材讲义，RAG 入库', icon: 'FolderOpened', color: '#67c23a' },
   { path: '/teacher/classes', title: '查看班级学情', desc: '班级概览与学生画像', icon: 'School', color: '#e6a23c' }
 ]
@@ -36,10 +36,10 @@ onMounted(async () => {
       </el-col>
       <el-col :span="17">
         <el-row :gutter="16">
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#a67b5b,#2f6fd0)"><span>所带班级</span><span class="num">{{ data.class_count || 0 }}</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#c4a484,#a67b5b)"><span>学生总数</span><span class="num">{{ data.student_count || 0 }}</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#8a6247,#6e4f38)"><span>班级平均正确率</span><span class="num">{{ ((data.accuracy || 0) * 100).toFixed(1) }}%</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#b08968,#8a6247)"><span>累计答题</span><span class="num">{{ data.total_answered || 0 }}</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#5B8DEF,#2F6FED)"><span>所带班级</span><span class="num">{{ data.class_count || 0 }}</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#7FB0F5,#2F6FED)"><span>学生总数</span><span class="num">{{ data.student_count || 0 }}</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#3E76E8,#1E3A8A)"><span>班级平均正确率</span><span class="num">{{ ((data.accuracy || 0) * 100).toFixed(1) }}%</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#43B97F,#2E9E6B)"><span>累计答题</span><span class="num">{{ data.total_answered || 0 }}</span></div></el-col>
         </el-row>
         <el-row :gutter="16" style="margin-top: 16px">
           <el-col v-for="q in quickLinks" :key="q.path" :span="8">
@@ -71,8 +71,8 @@ onMounted(async () => {
 .profile-card { text-align: center; }
 .name { font-size: 18px; font-weight: 700; margin: 10px 0 4px; }
 .meta { color: #909399; font-size: 13px; line-height: 1.9; }
-.quick { text-align: center; padding: 16px 8px; border: 1px solid #e8dfce; border-radius: 8px; cursor: pointer; transition: all .2s; background: #fff; }
-.quick:hover { border-color: #a67b5b; box-shadow: 0 2px 8px rgba(64,158,255,.2); }
+.quick { text-align: center; padding: 16px 8px; border: 1px solid #D0D5DD; border-radius: 8px; cursor: pointer; transition: all .2s; background: #fff; }
+.quick:hover { border-color: #9AA4B2; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 .q-title { font-weight: 600; margin-top: 8px; }
 .q-desc { font-size: 12px; color: #909399; margin-top: 4px; }
 .gray { color: #909399; font-size: 13px; }

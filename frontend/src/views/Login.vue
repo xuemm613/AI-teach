@@ -109,7 +109,7 @@ async function submit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #6e4f38 0%, #a67b5b 60%, #a67b5b 100%);
+  background: linear-gradient(135deg, #1E3A8A 0%, #2F6FED 60%, #2F6FED 100%);
 }
 .login-card {
   width: 420px;

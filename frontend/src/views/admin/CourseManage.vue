@@ -20,10 +20,10 @@ const subjectOptions = ref(SUBJECTS)
 // 科目配色（仅用于界面展示）
 const subjectColors = {
   '语文': '#e6a23c', '数学': '#409eff', '英语': '#67c23a', '物理': '#909399',
-  '化学': '#b88230', '生物': '#67c23a', '政治': '#f56c6c', '地理': '#36cfc9',
-  '历史': '#722ed1', '体育': '#fa8c16', '音乐': '#eb2f96', '美术': '#a67b5b', '劳动': '#8c8c8c'
+  '化学': '#fa541c', '生物': '#67c23a', '政治': '#f56c6c', '地理': '#36cfc9',
+  '历史': '#722ed1', '体育': '#fa8c16', '音乐': '#eb2f96', '美术': '#13c2c2', '劳动': '#8c8c8c'
 }
-function subjectColor(s) { return subjectColors[s] || '#a67b5b' }
+function subjectColor(s) { return subjectColors[s] || '#2F6FED' }
 
 const cellDialog = ref(false)
 const cellPos = ref(null)       // { period: 第几节下标, weekday: 星期下标 }
@@ -211,8 +211,8 @@ onMounted(async () => {
 <style scoped>
 .gray { color: #909399; font-size: 13px; }
 .cell { cursor: pointer; min-height: 44px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; border-radius: 6px; padding: 4px; transition: background .2s; }
-.cell:hover { background: #f4ebdd; }
+.cell:hover { background: #E9ECF2; }
 .cell .subject { font-weight: 600; }
-.cell .teachers { color: #a67b5b; font-size: 12px; }
+.cell .teachers { color: #606266; font-size: 12px; }
 .cell .empty { color: #c0c4cc; }
 </style>

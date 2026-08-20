@@ -79,7 +79,7 @@ onMounted(async () => { courses.value = await listCourses(); await load() })
       </el-table-column>
       <el-table-column label="难度" width="90"><template #default="{ row }"><el-tag :type="difficultyType[row.difficulty]" size="small">{{ difficultyMap[row.difficulty] }}</el-tag></template></el-table-column>
       <el-table-column label="知识点" min-width="150"><template #default="{ row }"><el-tag v-for="kp in row.knowledge_points || []" :key="kp" size="small" style="margin-right:4px">{{ kp }}</el-tag></template></el-table-column>
-      <el-table-column label="操作" width="140"><template #default="{ row }"><el-button type="primary" link @click="openEdit(row)">编辑</el-button><el-button type="danger" link @click="remove(row)">删除</el-button></template></el-table-column>
+      <el-table-column label="操作" width="140"><template #default="{ row }"><el-button type="info" link @click="openEdit(row)">编辑</el-button><el-button type="danger" link @click="remove(row)">删除</el-button></template></el-table-column>
     </el-table>
 
     <el-pagination style="margin-top:16px; justify-content:flex-end" layout="total, prev, pager, next" :total="total" :page-size="query.size" v-model:current-page="query.page" @current-change="load" />

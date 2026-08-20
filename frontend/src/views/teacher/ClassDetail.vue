@@ -50,10 +50,10 @@ onMounted(load)
           </div>
         </div>
         <el-row :gutter="16" style="margin-top: 16px">
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#a67b5b,#2f6fd0)"><span>学生人数</span><span class="num">{{ detail.student_count }}</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#c4a484,#a67b5b)"><span>累计答题</span><span class="num">{{ detail.total_answered }}</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#8a6247,#6e4f38)"><span>平均正确率</span><span class="num">{{ (detail.accuracy * 100).toFixed(1) }}%</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#b08968,#8a6247)"><span>薄弱知识点</span><span class="num" style="font-size:20px">{{ detail.weak_top?.length || 0 }} 个</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#5B8DEF,#2F6FED)"><span>学生人数</span><span class="num">{{ detail.student_count }}</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#7FB0F5,#2F6FED)"><span>累计答题</span><span class="num">{{ detail.total_answered }}</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#3E76E8,#1E3A8A)"><span>平均正确率</span><span class="num">{{ (detail.accuracy * 100).toFixed(1) }}%</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#43B97F,#2E9E6B)"><span>薄弱知识点</span><span class="num" style="font-size:20px">{{ detail.weak_top?.length || 0 }} 个</span></div></el-col>
         </el-row>
       </div>
 

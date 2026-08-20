@@ -123,9 +123,9 @@ onMounted(async () => {
 <template>
   <div class="page-card">
     <el-row :gutter="16" style="margin-bottom: 16px">
-      <el-col :span="8"><div class="stat-card" style="background: linear-gradient(135deg,#a67b5b,#2f6fd0)"><span>班级总数</span><span class="num">{{ classes.length }}</span></div></el-col>
-      <el-col :span="8"><div class="stat-card" style="background: linear-gradient(135deg,#c4a484,#a67b5b)"><span>班级学生总数</span><span class="num">{{ classes.reduce((s, c) => s + (c.student_count || 0), 0) }}</span></div></el-col>
-      <el-col :span="8"><div class="stat-card" style="background: linear-gradient(135deg,#8a6247,#6e4f38)"><span>任课教师</span><span class="num">{{ teachers.length }}</span></div></el-col>
+      <el-col :span="8"><div class="stat-card" style="background:#FFFFFF;color:#303133"><div class="stat-icon" style="background:#E9ECF2;color:#2F6FED"><el-icon :size="24"><School /></el-icon></div><div class="stat-info"><span>班级总数</span><span class="num">{{ classes.length }}</span></div></div></el-col>
+      <el-col :span="8"><div class="stat-card" style="background:#FFFFFF;color:#303133"><div class="stat-icon" style="background:#ECF8F1;color:#43B97F"><el-icon :size="24"><UserFilled /></el-icon></div><div class="stat-info"><span>班级学生总数</span><span class="num">{{ classes.reduce((s, c) => s + (c.student_count || 0), 0) }}</span></div></div></el-col>
+      <el-col :span="8"><div class="stat-card" style="background:#FFFFFF;color:#303133"><div class="stat-icon" style="background:#FDF6EC;color:#E6A23C"><el-icon :size="24"><Avatar /></el-icon></div><div class="stat-info"><span>任课教师</span><span class="num">{{ teachers.length }}</span></div></div></el-col>
     </el-row>
     <div class="toolbar">
       <el-input v-model="keyword" placeholder="搜索" clearable style="width: 220px" @keyup.enter="load" />
@@ -147,7 +147,7 @@ onMounted(async () => {
       <el-table-column label="操作" width="240">
         <template #default="{ row }">
           <el-button type="primary" link @click="openDetail(row)">详情/成员</el-button>
-          <el-button type="primary" link @click="openEdit(row)">编辑</el-button>
+          <el-button type="info" link @click="openEdit(row)">编辑</el-button>
           <el-button type="danger" link @click="remove(row)">删除</el-button>
         </template>
       </el-table-column>
@@ -207,4 +207,8 @@ onMounted(async () => {
 <style scoped>
 .toolbar { display: flex; gap: 10px; margin-bottom: 16px; }
 .gray { color: #909399; font-size: 12px; }
+.stat-card { flex-direction: row; align-items: center; gap: 10px; padding: 16px; }
+.stat-icon { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat-info .num { font-size: 22px; }
 </style>

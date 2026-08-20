@@ -158,7 +158,7 @@ onMounted(() => {
 .section { margin-bottom: 14px; }
 .section h4 { margin-bottom: 6px; color: #303133; }
 .qa-item { margin-bottom: 8px; }
-.plan-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f5efe6; }
+.plan-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #DEE3EA; }
 .plan-info { cursor: pointer; flex: 1; min-width: 0; }
 .plan-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plan-meta { color: #909399; font-size: 12px; margin-top: 2px; }

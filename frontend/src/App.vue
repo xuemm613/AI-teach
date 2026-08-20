@@ -63,8 +63,13 @@ async function onCommand(command) {
 
   <el-container v-else class="layout">
     <el-aside width="220px" class="aside">
-      <div class="logo">AI 教育智能体</div>
-      <el-menu :default-active="activeMenu" router background-color="transparent" text-color="#f5efe4" active-text-color="#ffffff">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true">
+          <path fill="#8B5CF6" d="M5 13.18v4L12 21l7-3.82v-4L12 17l-7-3.82zM12 3L1 9l11 6 9-4.91V17h2V9L12 3z"/>
+        </svg>
+        <span>AI 教育智能体</span>
+      </div>
+      <el-menu :default-active="activeMenu" router background-color="transparent" text-color="#303133" active-text-color="#7C3AED">
         <el-menu-item v-for="item in menus" :key="item.path" :index="item.path">
           <el-icon><component :is="item.icon" /></el-icon>
           <span>{{ item.title }}</span>
@@ -79,7 +84,7 @@ async function onCommand(command) {
           <span class="user">
             <el-avatar :size="30" :src="userStore.user?.avatar || undefined">{{ (userStore.user?.full_name || userStore.user?.username || 'U').slice(0, 1) }}</el-avatar>
             <span>{{ userStore.user?.full_name || userStore.user?.username }}</span>
-            <el-tag size="small" type="primary" effect="plain">{{ roleText }}</el-tag>
+            <el-tag size="small" type="info" effect="plain">{{ roleText }}</el-tag>
           </span>
           <template #dropdown>
             <el-dropdown-menu>

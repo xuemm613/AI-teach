@@ -133,9 +133,9 @@ function fmtTime(t) {
 }
 
 const typeMeta = {
-  exercise: { label: '做了题', color: '#a67b5b' },
-  question: { label: '问了问题', color: '#8a6247' },
-  collect: { label: '收藏错题', color: '#a67b5b' }
+  exercise: { label: '做了题', color: '#2F6FED' },
+  question: { label: '问了问题', color: '#F2A93B' },
+  collect: { label: '收藏错题', color: '#43B97F' }
 }
 
 // 错题本查看原题与正确答案
@@ -247,10 +247,10 @@ onBeforeUnmount(() => { if ('speechSynthesis' in window) window.speechSynthesis.
       <el-tabs v-model="tab" @tab-change="switchTab">
         <el-tab-pane label="学习统计" name="stats">
           <el-row :gutter="16">
-            <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#a67b5b,#7e5a3f)"><span>累计答题</span><span class="num">{{ stats.total_answered || 0 }}</span></div></el-col>
-            <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#c4a484,#a67b5b)"><span>答对题数</span><span class="num">{{ stats.correct_count || 0 }}</span></div></el-col>
-            <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#8a6247,#6e4f38)"><span>正确率</span><span class="num">{{ ((stats.accuracy || 0) * 100).toFixed(1) }}%</span></div></el-col>
-            <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#b08968,#8a6247)"><span>涉及知识点</span><span class="num">{{ (stats.knowledge_mastery || []).length }}</span></div></el-col>
+            <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#2F6FED,#1D4ED8)"><span>累计答题</span><span class="num">{{ stats.total_answered || 0 }}</span></div></el-col>
+            <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#7FB0F5,#2F6FED)"><span>答对题数</span><span class="num">{{ stats.correct_count || 0 }}</span></div></el-col>
+            <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#3E76E8,#1E3A8A)"><span>正确率</span><span class="num">{{ ((stats.accuracy || 0) * 100).toFixed(1) }}%</span></div></el-col>
+            <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#43B97F,#2E9E6B)"><span>涉及知识点</span><span class="num">{{ (stats.knowledge_mastery || []).length }}</span></div></el-col>
           </el-row>
           <el-row :gutter="16" style="margin-top: 16px">
             <el-col :span="12"><div id="radarChart" style="height: 320px"></div></el-col>
@@ -300,7 +300,7 @@ onBeforeUnmount(() => { if ('speechSynthesis' in window) window.speechSynthesis.
           <el-timeline style="padding-left: 6px">
             <el-timeline-item v-for="(item, i) in timeline" :key="i" :timestamp="fmtTime(item.time)" :color="typeMeta[item.type]?.color" placement="top">
               <div>
-                <el-tag size="small" style="border:none; background:#f4ebdd; color:#a67b5b">{{ typeMeta[item.type]?.label }}</el-tag>
+                <el-tag size="small" style="border:none; background:#E9ECF2; color:#2F6FED">{{ typeMeta[item.type]?.label }}</el-tag>
                 <span style="margin-left:6px">{{ item.title }}</span>
                 <el-tag v-if="item.type === 'exercise'" size="small" :type="item.is_correct ? 'success' : 'danger'" style="margin-left:6px">{{ item.is_correct ? '正确' : '错误' }}</el-tag>
               </div>
@@ -316,11 +316,11 @@ onBeforeUnmount(() => { if ('speechSynthesis' in window) window.speechSynthesis.
 
 <style scoped>
 .plan-card h3 { margin-bottom: 4px; }
-.plan-progress { color: #a67b5b; font-size: 14px; padding: 20px 0; text-align: center; }
+.plan-progress { color: #2F6FED; font-size: 14px; padding: 20px 0; text-align: center; }
 .plan-date { color: #909399; font-size: 13px; margin-bottom: 12px; }
 .gray { color: #909399; font-size: 13px; }
 .plan-section { margin-bottom: 14px; }
-.plan-section h4 { margin-bottom: 6px; color: #7e5a3f; }
+.plan-section h4 { margin-bottom: 6px; color: #1D4ED8; }
 .plan-section ul { padding-left: 22px; }
 .plan-section li { margin: 3px 0; }
 .wrong-detail p { line-height: 1.7; margin: 6px 0; }
