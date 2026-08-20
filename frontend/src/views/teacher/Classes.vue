@@ -34,5 +34,5 @@ onMounted(async () => {
 .class-card { cursor: pointer; }
 .c-name { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
 .c-meta { color: #909399; font-size: 13px; margin-bottom: 10px; }
-.c-link { margin-top: 12px; color: #2F6FED; font-size: 13px; }
+.c-link { margin-top: 12px; color: #8B5CF6; font-size: 13px; }
 </style>

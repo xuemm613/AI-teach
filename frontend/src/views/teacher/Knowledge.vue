@@ -102,43 +102,45 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
   <el-row :gutter="16">
     <el-col :span="15">
       <div class="page-card">
-        <div style="display:flex; gap:10px; margin-bottom: 12px; align-items:center">
-          <span>当前学科：</span>
-          <el-tag type="primary">{{ subject || '未分配' }}</el-tag>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 16px">
+          <h3>知识库文档</h3>
+          <el-tag type="primary">当前学科：{{ subject || '未分配' }}</el-tag>
         </div>
 
         <el-upload drag multiple :show-file-list="false" :http-request="customUpload" accept=".pdf,.docx,.txt,.md" style="margin-bottom: 16px">
-          <el-icon size="40" color="#2F6FED"><UploadFilled /></el-icon>
+          <el-icon size="44" color="#8B5CF6"><UploadFilled /></el-icon>
           <div class="el-upload__text">拖拽文件到此处，或 <em>点击上传</em></div>
         </el-upload>
 
-        <el-table :data="files" v-loading="loading" stripe>
-          <el-table-column prop="filename" label="文件名" min-width="200" show-overflow-tooltip />
-          <el-table-column prop="file_type" label="类型" width="80" />
-          <el-table-column label="上传时间" width="170"><template #default="{ row }">{{ new Date(row.created_at).toLocaleString() }}</template></el-table-column>
-          <el-table-column label="状态" width="110">
-            <template #default="{ row }">
-              <el-tooltip v-if="row.error" :content="row.error" placement="top">
-                <el-tag :type="statusType[row.status]">{{ statusMap[row.status] }}</el-tag>
-              </el-tooltip>
-              <el-tag v-else :type="statusType[row.status]">{{ statusMap[row.status] }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="130">
-            <template #default="{ row }">
-              <el-button type="primary" link @click="viewContent(row)">查看</el-button>
-              <el-button type="danger" link @click="remove(row.id)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-empty v-if="!files.length" description="暂无文件" />
+        <div v-loading="loading">
+          <div v-if="files.length" class="file-list">
+            <div v-for="f in files" :key="f.id" class="file-item">
+              <div class="file-icon"><el-icon><Document /></el-icon></div>
+              <div class="file-info">
+                <div class="file-name">{{ f.filename }}</div>
+                <div class="file-meta">{{ f.file_type }} · {{ new Date(f.created_at).toLocaleString() }}</div>
+              </div>
+              <div class="file-status">
+                <el-tooltip v-if="f.error" :content="f.error" placement="top">
+                  <el-tag :type="statusType[f.status]">{{ statusMap[f.status] }}</el-tag>
+                </el-tooltip>
+                <el-tag v-else :type="statusType[f.status]">{{ statusMap[f.status] }}</el-tag>
+              </div>
+              <div class="file-actions">
+                <el-button type="primary" link @click="viewContent(f)">查看</el-button>
+                <el-button type="danger" link @click="remove(f.id)">删除</el-button>
+              </div>
+            </div>
+          </div>
+          <el-empty v-else description="暂无文件" />
+        </div>
       </div>
     </el-col>
     <el-col :span="9">
-      <div class="page-card">
-        <h3 style="margin-bottom: 12px">知识库问答（RAG）</h3>
-        <el-input v-model="qaQuestion" type="textarea" :rows="3" placeholder="请输入问题" />
-        <el-button type="primary" style="margin-top: 10px; width: 100%" :loading="qaAsking" @click="doAsk">提问</el-button>
+      <div class="page-card qa-card">
+        <h3 style="margin-bottom: 20px; display:flex; align-items:center"><el-icon style="margin-right:6px"><ChatDotRound /></el-icon>知识库问答（RAG）</h3>
+        <el-input v-model="qaQuestion" type="textarea" :rows="5" placeholder="请输入问题，基于已上传的知识库内容回答" />
+        <el-button type="primary" style="margin-top: 16px; width: 100%" :loading="qaAsking" @click="doAsk">提问</el-button>
         <template v-if="qaAnswer">
           <div class="qa-box">
             <MarkdownView :content="qaAnswer" />
@@ -158,6 +160,15 @@ onBeforeUnmount(() => { if (pollTimer) clearInterval(pollTimer) })
 
 <style scoped>
 .gray { color: #909399; font-size: 12px; }
-.qa-box { margin-top: 14px; padding: 12px; background: #F4F6F9; border: 1px solid #D0D5DD; border-radius: 8px; }
+.file-list { display: flex; flex-direction: column; gap: 12px; }
+.file-item { display: flex; align-items: center; gap: 14px; padding: 16px; border: 1px solid #E5E7EB; border-radius: 10px; background: #F9FAFB; transition: all .2s; }
+.file-item:hover { border-color: #C4B5FD; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.12); }
+.file-icon { width: 40px; height: 40px; border-radius: 10px; background: #F3EDFB; color: #8B5CF6; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 20px; }
+.file-info { flex: 1; min-width: 0; }
+.file-name { font-weight: 600; font-size: 15px; color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-meta { color: #909399; font-size: 13px; margin-top: 4px; }
+.file-actions { flex-shrink: 0; }
+.qa-card { height: 100%; display: flex; flex-direction: column; }
+.qa-box { margin-top: 18px; padding: 16px; background: #F4F6F9; border: 1px solid #D0D5DD; border-radius: 8px; flex: 1; overflow-y: auto; }
 .content-box pre { white-space: pre-wrap; word-break: break-all; font-size: 13px; line-height: 1.7; max-height: 60vh; overflow-y: auto; }
 </style>

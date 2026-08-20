@@ -125,6 +125,16 @@ npm run dev
 
 > 登录规则：**教师使用工号登录、学生使用学号登录、管理员使用用户名登录**（学生/教师不再使用用户名登录）。
 
+### 7. 加载测试数据（可选）
+
+如需查看带数据的展示效果（学习记录、错题本、教案、知识库文件、班级课表等），先配置好 `.env` 并启动 MySQL，再执行：
+
+```bash
+cd backend
+.venv\Scripts\activate              # Windows（Linux/macOS：source .venv/bin/activate）
+python ../scripts/seed_demo_data.py # 幂等，可重复执行
+```
+
 ## 六、主要功能说明
 
 ### 学生端

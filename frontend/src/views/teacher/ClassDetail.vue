@@ -50,10 +50,10 @@ onMounted(load)
           </div>
         </div>
         <el-row :gutter="16" style="margin-top: 16px">
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#5B8DEF,#2F6FED)"><span>学生人数</span><span class="num">{{ detail.student_count }}</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#7FB0F5,#2F6FED)"><span>累计答题</span><span class="num">{{ detail.total_answered }}</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#3E76E8,#1E3A8A)"><span>平均正确率</span><span class="num">{{ (detail.accuracy * 100).toFixed(1) }}%</span></div></el-col>
-          <el-col :span="6"><div class="stat-card" style="background: linear-gradient(135deg,#43B97F,#2E9E6B)"><span>薄弱知识点</span><span class="num" style="font-size:20px">{{ detail.weak_top?.length || 0 }} 个</span></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background:#FFFFFF;color:#303133"><div class="stat-icon" style="background:#ECF8F1;color:#43B97F"><el-icon :size="24"><UserFilled /></el-icon></div><div class="stat-info"><span>学生人数</span><span class="num">{{ detail.student_count }}</span></div></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background:#FFFFFF;color:#303133"><div class="stat-icon" style="background:#FDECEC;color:#F56C6C"><el-icon :size="24"><Document /></el-icon></div><div class="stat-info"><span>累计答题</span><span class="num">{{ detail.total_answered }}</span></div></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background:#FFFFFF;color:#303133"><div class="stat-icon" style="background:#FDF6EC;color:#E6A23C"><el-icon :size="24"><DataAnalysis /></el-icon></div><div class="stat-info"><span>平均正确率</span><span class="num">{{ (detail.accuracy * 100).toFixed(1) }}%</span></div></div></el-col>
+          <el-col :span="6"><div class="stat-card" style="background:#FFFFFF;color:#303133"><div class="stat-icon" style="background:#E9ECF2;color:#2F6FED"><el-icon :size="24"><Warning /></el-icon></div><div class="stat-info"><span>薄弱知识点</span><span class="num">{{ detail.weak_top?.length || 0 }} 个</span></div></div></el-col>
         </el-row>
       </div>
 
@@ -91,5 +91,10 @@ onMounted(load)
 </template>
 
 <style scoped>
+.stat-card { flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; min-height: 168px; }
+.stat-icon { width: 40px; height: 40px; border-radius: 10px; background: #E9ECF2; color: #2F6FED; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.stat-info { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 2px; min-width: 0; }
+.stat-info span:first-child { font-size: 16px; }
+.stat-info .num { font-size: 30px; }
 .gray { color: #909399; font-size: 13px; }
 </style>

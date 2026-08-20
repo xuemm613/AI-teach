@@ -8,6 +8,8 @@ const route = useRoute()
 const router = useRouter()
 const profile = ref(null)
 const loading = ref(true)
+const wrongDialog = ref(false)
+const behaviorDialog = ref(false)
 let radar = null
 let trend = null
 
@@ -22,7 +24,16 @@ function render() {
         title: { text: '各知识点掌握度' },
         tooltip: {},
         radar: { indicator: mastery.map((m) => ({ name: m.knowledge_point, max: 100 })) },
-        series: [{ type: 'radar', data: [{ value: mastery.map((m) => m.mastery), name: '掌握度' }] }]
+        series: [{
+          type: 'radar',
+          data: [{
+            value: mastery.map((m) => m.mastery),
+            name: '掌握度',
+            areaStyle: { color: 'rgba(139, 92, 246, 0.25)' },
+            lineStyle: { color: '#8B5CF6' },
+            itemStyle: { color: '#8B5CF6' }
+          }]
+        }]
       })
     }
     if (activity.length && document.getElementById('trendChart')) {
@@ -32,7 +43,12 @@ function render() {
         tooltip: { trigger: 'axis' },
         xAxis: { type: 'category', data: activity.map((d) => d.date) },
         yAxis: { type: 'value' },
-        series: [{ type: 'line', smooth: true, areaStyle: {}, data: activity.map((d) => d.count) }]
+        series: [{
+          type: 'line', smooth: true,
+          color: '#F97316',
+          areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(249, 115, 22, 0.4)' }, { offset: 1, color: 'rgba(255, 255, 255, 0)' }]) },
+          data: activity.map((d) => d.count)
+        }]
       })
     }
   } catch (e) {
@@ -62,19 +78,44 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dis
         <el-button @click="router.back()">← 返回班级</el-button>
       </div>
       <el-row :gutter="16">
-        <el-col :span="8">
-          <div class="page-card">
+        <el-col :span="10">
+          <div class="page-card info-card">
             <h3 style="margin-bottom: 14px">学生基础信息</h3>
-            <el-descriptions :column="1" border>
-              <el-descriptions-item label="姓名">{{ profile.student.full_name }}</el-descriptions-item>
-              <el-descriptions-item label="学号">{{ profile.student.student_no || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="年级">{{ profile.student.grade || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="班级">{{ profile.classes.map((c) => c.class_name).join('、') || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="30天答题">{{ profile.total_answered_30d }}</el-descriptions-item>
-            </el-descriptions>
+            <div class="info-list">
+              <div class="info-item">
+                <div class="info-icon" style="background:#E9ECF2;color:#2F6FED"><el-icon><User /></el-icon></div>
+                <div class="info-text"><span>姓名</span><b>{{ profile.student.full_name }}</b></div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon" style="background:#F3EDFB;color:#722ED1"><el-icon><Postcard /></el-icon></div>
+                <div class="info-text"><span>学号</span><b>{{ profile.student.student_no || '-' }}</b></div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon" style="background:#ECF8F1;color:#43B97F"><el-icon><Reading /></el-icon></div>
+                <div class="info-text"><span>年级</span><b>{{ profile.student.grade || '-' }}</b></div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon" style="background:#FDF6EC;color:#E6A23C"><el-icon><School /></el-icon></div>
+                <div class="info-text"><span>班级</span><b>{{ profile.classes.map((c) => c.class_name).join('、') || '-' }}</b></div>
+              </div>
+              <div class="info-item">
+                <div class="info-icon" style="background:#FDECEC;color:#F56C6C"><el-icon><DataAnalysis /></el-icon></div>
+                <div class="info-text"><span>30天答题</span><b>{{ profile.total_answered_30d }}</b></div>
+              </div>
+            </div>
+          </div>
+          <div class="info-modules">
+            <div class="info-module" @click="wrongDialog = true">
+              <el-icon :size="24" color="#F56C6C"><WarningFilled /></el-icon>
+              <span>错题历史</span>
+            </div>
+            <div class="info-module" @click="behaviorDialog = true">
+              <el-icon :size="24" color="#8B5CF6"><Histogram /></el-icon>
+              <span>学习行为记录</span>
+            </div>
           </div>
         </el-col>
-        <el-col :span="16">
+        <el-col :span="14">
           <div class="page-card">
             <el-empty v-if="!(profile.knowledge_mastery || []).length" description="暂无知识点掌握数据" :image-size="60" />
             <div v-else id="masteryChart" style="height: 320px"></div>
@@ -86,36 +127,42 @@ onBeforeUnmount(() => { window.removeEventListener('resize', resize); radar?.dis
         </el-col>
       </el-row>
 
-      <el-row :gutter="16" style="margin-top: 16px">
-        <el-col :span="12">
-          <div class="page-card">
-            <h3 style="margin-bottom: 12px">错题历史（{{ profile.wrong_history.length }}）</h3>
-            <div v-for="w in profile.wrong_history" :key="w.id" class="wrong-item">
-              <div class="w-title">{{ w.exercise.content }}</div>
-              <div class="w-meta">正确答案：{{ w.exercise.answer }}</div>
-            </div>
-            <el-empty v-if="!profile.wrong_history.length" description="暂无错题" :image-size="60" />
+      <el-dialog v-model="wrongDialog" title="错题历史" width="640px">
+        <div v-for="w in profile.wrong_history" :key="w.id" class="wrong-item">
+          <div class="w-title">{{ w.exercise.content }}</div>
+          <div class="w-meta">正确答案：{{ w.exercise.answer }}</div>
+        </div>
+        <el-empty v-if="!profile.wrong_history.length" description="暂无错题" :image-size="60" />
+        <template #footer><el-button @click="wrongDialog = false">关闭</el-button></template>
+      </el-dialog>
+
+      <el-dialog v-model="behaviorDialog" title="学习行为记录" width="640px">
+        <div v-for="(b, i) in profile.behavior_records" :key="i" class="wrong-item">
+          <div class="w-title">
+            {{ b.content }}
+            <el-tag size="small" :type="b.is_correct ? 'success' : 'danger'">{{ b.is_correct ? '答对' : '答错' }}</el-tag>
           </div>
-        </el-col>
-        <el-col :span="12">
-          <div class="page-card">
-            <h3 style="margin-bottom: 12px">学习行为记录（最近 30 条）</h3>
-            <div v-for="(b, i) in profile.behavior_records" :key="i" class="wrong-item">
-              <div class="w-title">
-                {{ b.content }}
-                <el-tag size="small" :type="b.is_correct ? 'success' : 'danger'">{{ b.is_correct ? '答对' : '答错' }}</el-tag>
-              </div>
-              <div class="w-meta">{{ new Date(b.time).toLocaleString() }}</div>
-            </div>
-            <el-empty v-if="!profile.behavior_records.length" description="暂无行为记录" :image-size="60" />
-          </div>
-        </el-col>
-      </el-row>
+          <div class="w-meta">{{ new Date(b.time).toLocaleString() }}</div>
+        </div>
+        <el-empty v-if="!profile.behavior_records.length" description="暂无行为记录" :image-size="60" />
+        <template #footer><el-button @click="behaviorDialog = false">关闭</el-button></template>
+      </el-dialog>
     </template>
   </div>
 </template>
 
 <style scoped>
+.info-list { display: flex; flex-direction: column; }
+.info-item { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid #F0F2F5; }
+.info-item:last-child { border-bottom: none; }
+.info-icon { width: 42px; height: 42px; border-radius: 12px; font-size: 21px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.info-text { display: flex; flex-direction: column; gap: 3px; }
+.info-text span { font-size: 13px; color: #909399; }
+.info-text b { font-size: 16px; color: #303133; font-weight: 600; }
+.info-modules { display: flex; gap: 12px; margin-top: 16px; }
+.info-module { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px 8px; border: 1px solid #D0D5DD; border-radius: 8px; cursor: pointer; transition: all .2s; background: #fff; }
+.info-module:hover { border-color: #C4B5FD; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.12); }
+.info-module span { font-weight: 600; font-size: 14px; color: #303133; }
 .wrong-item { padding: 8px 0; border-bottom: 1px solid #DEE3EA; }
 .w-title { font-size: 14px; }
 .w-meta { color: #909399; font-size: 12px; margin-top: 2px; }

@@ -63,7 +63,7 @@ onMounted(() => {
 <template>
   <div>
     <el-row :gutter="16">
-      <el-col :span="14">
+      <el-col :span="12">
         <div class="page-card">
           <h3 style="margin-bottom: 16px">智能备课</h3>
           <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
@@ -85,7 +85,7 @@ onMounted(() => {
 
         <div class="page-card" style="margin-top: 16px" v-loading="generating">
           <h3 style="margin-bottom: 12px">教案展示</h3>
-          <el-empty v-if="!plan && !generating" description="生成后将在此结构化展示教案" />
+          <el-empty v-if="!plan && !generating" description="生成的教案在此显示" />
           <template v-if="plan">
             <el-alert type="success" :closable="false" style="margin-bottom: 12px">
               {{ plan.subject }} · {{ plan.grade }} · {{ plan.chapter }}
@@ -129,7 +129,7 @@ onMounted(() => {
         </div>
       </el-col>
 
-      <el-col :span="10">
+      <el-col :span="12">
         <div class="page-card">
           <h3 style="margin-bottom: 12px">生成历史</h3>
           <div style="display:flex; gap:8px; margin-bottom:12px">
@@ -142,7 +142,7 @@ onMounted(() => {
               <div class="plan-title">{{ p.subject }} · {{ p.chapter }}</div>
               <div class="plan-meta">{{ p.grade }} · {{ new Date(p.created_at).toLocaleString() }}</div>
             </div>
-            <div>
+            <div class="plan-actions">
               <el-button size="small" type="primary" link @click="plan = p">查看</el-button>
               <el-button size="small" type="danger" link @click="remove(p.id)">删除</el-button>
             </div>
@@ -158,8 +158,9 @@ onMounted(() => {
 .section { margin-bottom: 14px; }
 .section h4 { margin-bottom: 6px; color: #303133; }
 .qa-item { margin-bottom: 8px; }
-.plan-item { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #DEE3EA; }
+.plan-item { display: flex; align-items: center; justify-content: space-between; padding: 18px 16px; margin-bottom: 14px; border: 1px solid #E5E7EB; border-radius: 10px; background: #F9FAFB; transition: all .2s; }
+.plan-item:hover { border-color: #C4B5FD; box-shadow: 0 2px 8px rgba(139, 92, 246, 0.12); }
 .plan-info { cursor: pointer; flex: 1; min-width: 0; }
-.plan-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plan-meta { color: #909399; font-size: 12px; margin-top: 2px; }
+.plan-title { font-weight: 600; font-size: 15px; color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-meta { color: #909399; font-size: 13px; margin-top: 6px; }
 </style>
