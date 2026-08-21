@@ -1,7 +1,8 @@
 """个性化学习 Agent 接口。"""
 import json
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +28,12 @@ from app.services.agent_service import TutorTools
 from app.utils.prompt_templates import EXERCISE_GENERATION_PROMPT, STUDENT_ANALYSIS_PROMPT
 
 router = APIRouter(prefix="/tutor", tags=["个性化辅导"])
+
+
+def _gen_norm(text: str) -> str:
+    """内容归一化哈希（去空白/转小写），用于判重。"""
+    from app.services.text import norm_text
+    return norm_text(text)
 
 
 def task_to_dict(task: AgentTask) -> dict:
@@ -89,9 +96,11 @@ async def my_analysis_latest(
 async def my_analysis(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    subject: Optional[str] = Query(None, description="仅基于该科目生成方案"),
 ):
     """学生个人学情分析：仅拉取学生自身的学习记录、错题本、薄弱知识点生成方案；
-    若没有任何学习记录，则直接提示学习活动太少，不检索其他数据。"""
+    若没有任何学习记录，则直接提示学习活动太少，不检索其他数据。
+    subject 非空时，只使用该科目的错题与作答记录，方案更具针对性。"""
     if user.role != "student":
         return fail("仅学生可生成个人学情分析")
     student = (
@@ -100,15 +109,16 @@ async def my_analysis(
     if student is None:
         return fail("学生资料不存在")
 
-    # 最近错题（仅学生自己的错题本，带题目内容）
+    # 最近错题（仅学生自己的错题本，带题目内容；可按科目过滤）
+    wrong_stmt = (
+        select(WrongBook, Exercise)
+        .join(Exercise, Exercise.id == WrongBook.exercise_id)
+        .where(WrongBook.student_id == student.id)
+    )
+    if subject:
+        wrong_stmt = wrong_stmt.join(Course, Course.id == Exercise.course_id).where(Course.subject == subject)
     wrong_rows = (
-        await db.execute(
-            select(WrongBook, Exercise)
-            .join(Exercise, Exercise.id == WrongBook.exercise_id)
-            .where(WrongBook.student_id == student.id)
-            .order_by(WrongBook.created_at.desc())
-            .limit(10)
-        )
+        await db.execute(wrong_stmt.order_by(WrongBook.created_at.desc()).limit(10))
     ).all()
     wrong_exercises = [
         {
@@ -120,15 +130,16 @@ async def my_analysis(
         for wb, ex in wrong_rows
     ]
 
-    # 学习记录统计（仅学生自己的作答记录）
+    # 学习记录统计（仅学生自己的作答记录；可按科目过滤）
+    rec_stmt = (
+        select(LearningRecord, Exercise)
+        .join(Exercise, Exercise.id == LearningRecord.exercise_id)
+        .where(LearningRecord.student_id == student.id)
+    )
+    if subject:
+        rec_stmt = rec_stmt.join(Course, Course.id == Exercise.course_id).where(Course.subject == subject)
     record_rows = (
-        await db.execute(
-            select(LearningRecord, Exercise)
-            .join(Exercise, Exercise.id == LearningRecord.exercise_id)
-            .where(LearningRecord.student_id == student.id)
-            .order_by(LearningRecord.created_at.desc())
-            .limit(50)
-        )
+        await db.execute(rec_stmt.order_by(LearningRecord.created_at.desc()).limit(50))
     ).all()
     total = len(record_rows)
     correct = sum(1 for rec, _ in record_rows if rec.is_correct)
@@ -208,14 +219,46 @@ async def generate_exercise(
     user: User = Depends(require_roles("admin", "teacher", "student")),
     db: AsyncSession = Depends(get_db),
 ):
-    """按知识点 + 难度生成练习题。"""
+    """按知识点 + 难度生成练习题。
+
+    多样性/去重控制：
+    - exclude_contents：提示 LLM 避开已生成题目，杜绝"再出一题"生成同一道题；
+    - 若生成结果仍与历史归一化后雷同，则强制换表述重新生成一次（仅采纳不重复项）。
+    """
     prompt = EXERCISE_GENERATION_PROMPT.format(
         knowledge_point=payload.knowledge_point, difficulty=payload.difficulty
     )
+    exclude = [c for c in (payload.exclude_contents or []) if c]
+    vary_hint = ""
+    if exclude:
+        vary_hint = (
+            "\n请务必不要生成与下列已生成题目重复或雷同的内容：\n"
+            + "\n".join("- %s" % (str(c)[:80]) for c in exclude)
+        )
+    elif payload.force_vary:
+        vary_hint = "\n请换一种全新的场景/数据/表述，尽量与前一道题不同。"
+
     data = await llm_client.chat_json(
-        [{"role": "system", "content": prompt}], temperature=0.6, max_tokens=1024
+        [{"role": "system", "content": prompt + vary_hint}], temperature=0.7, max_tokens=1024
     )
     # 与学习/学科无关的知识点：发出禁答提示
+    if data.get("refused"):
+        return fail(data.get("message") or "该内容与学习/学科无关，无法生成练习题")
+    # 仍与历史雷同：强制换表述再生成一次（仅采纳不重复项）
+    excluded_set = {_gen_norm(c) for c in exclude}
+    if exclude and _gen_norm(data.get("content")) in excluded_set:
+        try:
+            data = await llm_client.chat_json(
+                [{
+                    "role": "system",
+                    "content": prompt + vary_hint
+                    + "\n必须换一种完全不同的数据/场景/表述，绝不能与上述题目重复。",
+                }],
+                temperature=0.9,
+                max_tokens=1024,
+            )
+        except Exception:  # noqa: BLE001 重新生成失败则沿用首次结果
+            pass
     if data.get("refused"):
         return fail(data.get("message") or "该内容与学习/学科无关，无法生成练习题")
     # 确定题目所属课程：优先用传入的 course_id；否则按科目查找/创建课程，

@@ -45,6 +45,9 @@ from app.schemas.user import (
     UserUpdate,
     WrongBookAddRequest,
 )
+from app.core.llm import llm_client, parse_json
+from app.services.kp_similarity import ExerciseFeature, KP_SYNONYMS, canonical_kps, expanded_kps, select_similar
+from app.utils.prompt_templates import SIMILAR_EXERCISE_PROMPT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["用户"])
@@ -123,15 +126,17 @@ async def _get_teacher(db: AsyncSession, user: User) -> Teacher:
     return teacher
 
 
-async def _knowledge_mastery(db: AsyncSession, student_id: int, limit: int = 1000) -> List[dict]:
-    """按知识点统计作答正确率（用于雷达图/进度条）。"""
-    result = await db.execute(
-        select(LearningRecord, Exercise)
-        .join(Exercise, Exercise.id == LearningRecord.exercise_id)
-        .where(LearningRecord.student_id == student_id)
-        .order_by(desc(LearningRecord.created_at))
-        .limit(limit)
-    )
+async def _knowledge_mastery(
+    db: AsyncSession, student_id: int, limit: int = 1000, subject: Optional[str] = None
+) -> List[dict]:
+    """按知识点统计作答正确率（用于雷达图/进度条）；subject 非空时仅统计该科目。"""
+    stmt = select(LearningRecord, Exercise).join(Exercise, Exercise.id == LearningRecord.exercise_id)
+    cond = [LearningRecord.student_id == student_id]
+    if subject:
+        stmt = stmt.join(Course, Course.id == Exercise.course_id)
+        cond.append(Course.subject == subject)
+    stmt = stmt.where(*cond).order_by(desc(LearningRecord.created_at)).limit(limit)
+    result = await db.execute(stmt)
     stats: dict = defaultdict(lambda: {"total": 0, "correct": 0})
     for rec, ex in result.all():
         for kp in ex.knowledge_points or []:
@@ -300,10 +305,19 @@ async def student_dashboard(
     now = datetime.now()
     week_ago = now - timedelta(days=7)
 
-    answered_total = (
+    # 答题统计（与 /me/stats 学情分析保持一致：按作答记录计数）
+    total_answered = (
         await db.execute(
-            select(func.count(func.distinct(LearningRecord.exercise_id))).where(
+            select(func.count(LearningRecord.id)).where(
                 LearningRecord.student_id == student.id
+            )
+        )
+    ).scalar() or 0
+    correct_count = (
+        await db.execute(
+            select(func.count(LearningRecord.id)).where(
+                LearningRecord.student_id == student.id,
+                LearningRecord.is_correct.is_(True),
             )
         )
     ).scalar() or 0
@@ -327,17 +341,22 @@ async def student_dashboard(
     ).scalar() or 0
 
     weak = await _weak_points(db, student.id, topn=10)
+    mastery = await _knowledge_mastery(db, student.id)
     classes = await _student_classes(db, student.id)
 
-    total_percent = round(answered_total / total_exercises * 100, 1) if total_exercises else 0
+    total_percent = round(total_answered / total_exercises * 100, 1) if total_exercises else 0
     return ok(
         {
             "user": user_to_dict(user, student),
             "classes": classes,
             "today_tasks": {
-                "pending_exercises": max(total_exercises - answered_total, 0),
+                "pending_exercises": max(total_exercises - total_answered, 0),
                 "wrong_review": wrong_count,
             },
+            "total_answered": total_answered,
+            "correct_count": correct_count,
+            "accuracy": round(correct_count / total_answered, 4) if total_answered else 0,
+            "subject_count": len(mastery),
             "weekly_seconds": weekly_seconds,
             "total_percent": total_percent,
             "weak_points": weak,
@@ -381,6 +400,51 @@ async def my_today_schedule(
     return ok(
         [
             {
+                "period": cs.period,
+                "class_name": cls.name,
+                "subject": cs.subject,
+                "teacher_name": teacher_names.get(link.teacher_user_id) if link else None,
+            }
+            for cs, cls, link in rows
+        ]
+    )
+
+
+@router.get("/me/week-schedule")
+async def my_week_schedule(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """学生本周课表：按班级课表返回周一~周五全部课程，用于看板「本周」格子视图。"""
+    student = await _get_student(db, user)
+    class_ids = (
+        await db.execute(select(ClassStudent.class_id).where(ClassStudent.student_id == student.id))
+    ).scalars().all()
+    if not class_ids:
+        return ok([])
+    rows = (
+        await db.execute(
+            select(ClassSchedule, Class, ClassScheduleTeacher)
+            .join(Class, Class.id == ClassSchedule.class_id)
+            .outerjoin(ClassScheduleTeacher, ClassScheduleTeacher.schedule_id == ClassSchedule.id)
+            .where(
+                ClassSchedule.class_id.in_(list(class_ids)),
+                ClassSchedule.weekday.between(1, 5),
+                ClassSchedule.subject.isnot(None),
+                ClassSchedule.subject != "",
+            )
+            .order_by(ClassSchedule.weekday, ClassSchedule.period)
+        )
+    ).all()
+    teacher_names: dict = {}
+    for cs, _cls, link in rows:
+        if link and link.teacher_user_id not in teacher_names:
+            t_user = await db.get(User, link.teacher_user_id)
+            teacher_names[link.teacher_user_id] = t_user.full_name or t_user.username if t_user else None
+    return ok(
+        [
+            {
+                "weekday": cs.weekday,
                 "period": cs.period,
                 "class_name": cls.name,
                 "subject": cs.subject,
@@ -569,19 +633,32 @@ async def submit_record(
 
 
 @router.get("/me/stats")
-async def my_stats(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def my_stats(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    subject: Optional[str] = Query(None, description="按科目过滤统计"),
+):
     student = await _get_student(db, user)
 
-    total = (
-        await db.execute(
-            select(func.count(LearningRecord.id)).where(LearningRecord.student_id == student.id)
+    def _rec_stmt():
+        stmt = (
+            select(LearningRecord)
+            .join(Exercise, Exercise.id == LearningRecord.exercise_id)
+            .where(LearningRecord.student_id == student.id)
         )
-    ).scalar() or 0
+        if subject:
+            stmt = (
+                stmt.join(Course, Course.id == Exercise.course_id)
+                .where(Course.subject == subject)
+            )
+        return stmt
+
+    total = (await db.execute(_rec_stmt().with_only_columns(func.count(LearningRecord.id)))).scalar() or 0
     correct = (
         await db.execute(
-            select(func.count(LearningRecord.id)).where(
-                LearningRecord.student_id == student.id, LearningRecord.is_correct.is_(True)
-            )
+            _rec_stmt().with_only_columns(
+                func.count(LearningRecord.id)
+            ).where(LearningRecord.is_correct.is_(True))
         )
     ).scalar() or 0
 
@@ -608,17 +685,22 @@ async def my_stats(user: User = Depends(get_current_user), db: AsyncSession = De
         for name, count, corr in by_course_rows
     ]
 
+    daily_stmt = (
+        select(func.date(LearningRecord.created_at), func.count(LearningRecord.id))
+        .join(Exercise, Exercise.id == LearningRecord.exercise_id)
+        .where(LearningRecord.student_id == student.id)
+    )
+    if subject:
+        daily_stmt = daily_stmt.join(Course, Course.id == Exercise.course_id).where(Course.subject == subject)
     daily_rows = (
         await db.execute(
-            select(func.date(LearningRecord.created_at), func.count(LearningRecord.id))
-            .where(LearningRecord.student_id == student.id)
-            .group_by(func.date(LearningRecord.created_at))
+            daily_stmt.group_by(func.date(LearningRecord.created_at))
             .order_by(func.date(LearningRecord.created_at))
         )
     ).all()
     daily = [{"date": str(d), "count": c} for d, c in daily_rows]
 
-    mastery = await _knowledge_mastery(db, student.id)
+    mastery = await _knowledge_mastery(db, student.id, subject=subject)
 
     return ok(
         {
@@ -631,6 +713,60 @@ async def my_stats(user: User = Depends(get_current_user), db: AsyncSession = De
         }
     )
 
+
+def _week_monday(d: date) -> date:
+    """返回 d 所在周的周一（周一为一周起点）。"""
+    from app.services.activity_stats import week_monday
+    return week_monday(d)
+
+
+def _build_activity_series(daily: dict, period: str, start: date) -> list:
+    """把按日期聚合的 {iso_date: count} 汇总为日/周/月序列。"""
+    from app.services.activity_stats import build_activity_series
+    return build_activity_series(daily, period, start)
+
+
+@router.get("/me/activity")
+async def my_activity(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    period: str = Query("day", pattern="^(day|week|month)$"),
+    subject: Optional[str] = Query(None, description="按科目过滤活跃度"),
+):
+    """学生学习活跃度趋势（日/周/月）。
+
+    仅统计该学生自身作答记录；date 窗口安全，避免全表扫描。
+    """
+    student = await _get_student(db, user)
+    today = date.today()
+    if period == "day":
+        start = today - timedelta(days=13)
+    elif period == "week":
+        start = _week_monday(today - timedelta(weeks=7))
+    else:  # month
+        y, m = today.year, today.month
+        for _ in range(5):
+            m -= 1
+            if m == 0:
+                m = 12
+                y -= 1
+        start = date(y, m, 1)
+
+    stmt = (
+        select(func.date(LearningRecord.created_at), func.count(LearningRecord.id))
+        .join(Exercise, Exercise.id == LearningRecord.exercise_id)
+        .where(
+            LearningRecord.student_id == student.id,
+            func.date(LearningRecord.created_at) >= start,
+        )
+    )
+    if subject:
+        stmt = stmt.join(Course, Course.id == Exercise.course_id).where(Course.subject == subject)
+    rows = (await db.execute(stmt.group_by(func.date(LearningRecord.created_at)))).all()
+    daily = {str(d): int(c) for d, c in rows}
+    return ok({"period": period, "items": _build_activity_series(daily, period, start)})
+
+
 # ------------------------- 错题本 -------------------------
 @router.get("/me/wrong-book")
 async def my_wrong_book(
@@ -641,16 +777,19 @@ async def my_wrong_book(
 ):
     student = await _get_student(db, user)
     result = await db.execute(
-        select(WrongBook, Exercise)
+        select(WrongBook, Exercise, Course)
         .join(Exercise, WrongBook.exercise_id == Exercise.id)
+        .join(Course, Course.id == Exercise.course_id, isouter=True)
         .where(WrongBook.student_id == student.id)
         .order_by(desc(WrongBook.created_at))
     )
     rows = result.all()
     items = []
-    for wb, ex in rows:
+    for wb, ex, course in rows:
         kps = ex.knowledge_points or []
         if knowledge_point and knowledge_point not in kps:
+            continue
+        if subject and (course is None or course.subject != subject):
             continue
         items.append(
             {
@@ -658,18 +797,28 @@ async def my_wrong_book(
                 "exercise_id": wb.exercise_id,
                 "reason": wb.reason,
                 "created_at": wb.created_at.isoformat() if wb.created_at else None,
+                "subject": course.subject if course else "",
                 "exercise": exercise_to_dict(ex),
             }
         )
-    if subject:
-        course_ids = [
-            c.id
-            for c in (
-                await db.execute(select(Course).where(Course.subject == subject))
-            ).scalars().all()
-        ]
-        items = [i for i in items if i["exercise"]["course_id"] in course_ids]
     return ok(items)
+
+
+@router.post("/me/wrong-book/batch-delete")
+async def batch_delete_wrong_book(
+    ids: list[int],
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    student = await _get_student(db, user)
+    result = await db.execute(
+        delete(WrongBook).where(
+            WrongBook.student_id == student.id,
+            WrongBook.id.in_(ids),
+        )
+    )
+    await db.commit()
+    return ok(None, message=f"已删除 {result.rowcount} 条错题")
 
 
 @router.post("/me/wrong-book")
@@ -736,6 +885,181 @@ async def get_exercises(
     result = await db.execute(stmt)
     exercises = result.scalars().all()
     return ok([exercise_to_dict(e) for e in exercises])
+
+
+@router.get("/me/similar-exercises")
+async def similar_exercises(
+    exercise_id: int = Query(..., ge=1, description="原题ID"),
+    limit: int = Query(3, ge=1, le=10, description="返回条数"),
+    allow_generate: bool = Query(True, description="题库不足时是否允许 AI 变式兜底"),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """相似例题推荐（P0 门限/硬过滤/回退 + P1 语义打标 + P2 AI 变式兜底）。
+
+    - P0 硬过滤：题型必须一致；可判定科目必须一致；
+      原题有知识点时候选必须至少命中一个语义知识点（剔除《蒹葭》类无关混入）；
+      归一化相似度低于门限不推；质量不足时 kp →（无标签时）章节/课程 逐级回退，宁缺毋滥。
+    - P1：knowledge_points 规范化 + 学科同义词/上下位别名扩展，语义匹配而非字符串相等。
+    - P2：高质量候选不足且允许时，调用 LLM 生成同知识点/同题型/同难度的变式题（内存返回，不写库）。
+    不修改任何数据库结构/数据模型/存储。
+    """
+    orig = await db.get(Exercise, exercise_id)
+    if orig is None:
+        return fail("题目不存在")
+
+    rows = (await db.execute(select(Exercise))).scalars().all()
+
+    # 批量加载课程科目，避免逐条查询
+    course_ids = {ex.course_id for ex in rows if ex.course_id} | {orig.course_id}
+    course_map = {}
+    if course_ids:
+        course_rows = (
+            await db.execute(select(Course).where(Course.id.in_(course_ids)))
+        ).scalars().all()
+        course_map = {c.id: c for c in course_rows}
+
+    def _feature(ex: Exercise) -> ExerciseFeature:
+        course = course_map.get(ex.course_id)
+        return ExerciseFeature(
+            id=ex.id,
+            type=ex.type,
+            difficulty=ex.difficulty,
+            subject=(course.subject if course else None) or "",
+            chapter=ex.chapter or "",
+            course_id=ex.course_id,
+            kps=ex.knowledge_points or [],
+        )
+
+    picked, level, insufficient = select_similar(
+        _feature(orig), [_feature(c) for c in rows], limit=limit, threshold=0.6
+    )
+    by_id = {c.id: c for c in rows}
+    results = [dict(exercise_to_dict(by_id[c.id])) for _, c in picked]
+
+    # P2：库中相似题不足 limit 道时，用 AI 生成同构变式补齐（内存返回，不落库）
+    need = limit - len(results)
+    generated = []
+    if need > 0 and allow_generate:
+        try:
+            generated = await _generate_similar_fallback(orig, need)
+        except Exception:  # noqa: BLE001  AI 兜底失败不影响主流程
+            logger.warning("相似题 AI 兜底生成失败，exercise_id=%s", exercise_id, exc_info=True)
+            generated = []
+
+    seen = {_norm(exercise_to_dict(by_id[c.id])["content"]) for _, c in picked}
+    fused = list(results)
+    gen_quality = []
+    for g in generated:
+        key = _norm(g.get("content") or "")
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        g["generated"] = True
+        fused.append(g)
+        gen_quality.append(_gen_quality(g))
+
+    return ok(
+        {
+            "items": fused,
+            "level": level,
+            "insufficient": len(fused) < limit,
+            "generated_count": len(gen_quality),
+            "quality": gen_quality,
+        },
+        message="相似例题推荐完成",
+    )
+
+
+def _norm(text: str) -> str:
+    return "".join((text or "").strip().split()).lower()
+
+
+def _gen_quality(g: dict) -> dict:
+    """生成结果的 AI 质量评估标记（供前端/测试观察，不含 DB 持久化）。"""
+    content_ok = bool((g.get("content") or "").strip())
+    answer_ok = bool((g.get("answer") or "").strip())
+    kp_ok = bool((g.get("knowledge_point") or "").strip())
+    ai_quality = (g.get("quality") or "low").lower()
+    if content_ok and answer_ok and kp_ok:
+        overall = ai_quality if ai_quality in ("high", "medium") else "low"
+    else:
+        overall = "low"
+    return {
+        "content_ok": content_ok,
+        "answer_ok": answer_ok,
+        "knowledge_point_ok": kp_ok,
+        "ai_quality": ai_quality,
+        "overall": overall,
+    }
+
+
+async def _generate_similar_fallback(orig: Exercise, limit: int) -> list:
+    """基于原题生成同构变式题；仅返回内存数据，绝不写入数据库。
+
+    P2 质量门槛：content/answer/knowledge_point 齐全、ai quality 非 low、
+    且生成题与原知识点语义一致（同义词收敛后必须命中）才放行。
+    """
+    original = json.dumps(exercise_to_dict(orig), ensure_ascii=False, default=str)
+    prompt = SIMILAR_EXERCISE_PROMPT.format(original=original)
+    out = []
+    seen = {_norm(orig.content)}
+    for _ in range(limit * 3):
+        try:
+            text = await llm_client.chat(
+                [{"role": "system", "content": prompt}], temperature=0.7, max_tokens=1024
+            )
+            data = parse_json(text)
+        except Exception:
+            logger.warning("单次 LLM 生成相似题失败，跳过本次重试", exc_info=True)
+            continue
+        data = data or {}
+        if not _passes_gen_gate(data, orig, seen):
+            continue
+        out.append(_coerce_generated(data, orig))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def _passes_gen_gate(data: dict, orig: Exercise, seen: set) -> bool:
+    content = data.get("content") or ""
+    answer = data.get("answer") or ""
+    kp = data.get("knowledge_point") or ""
+    if not (content and answer and kp):
+        return False
+    if _norm(content) in seen:
+        return False
+    if data.get("quality") == "low":
+        return False
+    # 知识点语义校验：仅当原题知识点在 KP_SYNONYMS 中有同义词映射时严格匹配
+    orig_kps = orig.knowledge_points or []
+    if orig_kps:
+        orig_canon = canonical_kps(orig_kps)
+        has_synonyms = any(c in KP_SYNONYMS for c in orig_canon)
+        if has_synonyms:
+            orig_exp = expanded_kps(orig_kps)
+            if orig_exp and not (orig_exp & expanded_kps([kp])):
+                return False
+    seen.add(_norm(content))
+    return True
+
+
+def _coerce_generated(data: dict, orig: Exercise) -> dict:
+    """将模型输出统一为前端可用结构（携带原题上下文，id 置空标识为生成题）。"""
+    return {
+        "id": None,
+        "course_id": orig.course_id,
+        "chapter": orig.chapter,
+        "type": orig.type,
+        "content": data.get("content", ""),
+        "options": data.get("options") or [],
+        "answer": data.get("answer", ""),
+        "analysis": data.get("analysis", ""),
+        "difficulty": data.get("difficulty") or orig.difficulty,
+        "knowledge_points": [data["knowledge_point"]] if data.get("knowledge_point") else [],
+        "generated": True,
+    }
 
 
 # ------------------------- 教师端：工作台概览 -------------------------

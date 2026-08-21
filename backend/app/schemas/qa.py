@@ -17,6 +17,11 @@ class AskRequest(BaseModel):
     subject: Optional[str] = None
     chapter: Optional[str] = None
     history: List[HistoryItem] = Field(default_factory=list)
+    # 学情分析结构化上下文
+    context_from: Optional[str] = Field(default=None, description="来源标识，如 'analysis'")
+    stage_name: Optional[str] = Field(default=None, description="学习阶段名称")
+    stage_content: Optional[str] = Field(default=None, description="学习阶段内容")
+    weak_points: Optional[str] = Field(default=None, description="薄弱点诊断")
 
 
 class CollectRequest(BaseModel):

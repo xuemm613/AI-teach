@@ -3,14 +3,14 @@ import request from './request'
 export const ask = (data) => request.post('/qa/ask', data).then((r) => r.data)
 
 // 流式问答：通过 fetch 读取 SSE，逐字回调
-export async function askStream({ question, session_id, subject, chapter, history, onToken, onDone }) {
+export async function askStream({ question, session_id, subject, chapter, history, onToken, onDone, context_from, stage_name, stage_content, weak_points }) {
   const res = await fetch('/api/v1/qa/ask-stream', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${localStorage.getItem('access_token') || ''}`
     },
-    body: JSON.stringify({ question, session_id, subject, chapter, history })
+    body: JSON.stringify({ question, session_id, subject, chapter, history, context_from, stage_name, stage_content, weak_points })
   })
   if (!res.ok || !res.body) throw new Error('请求失败')
   const reader = res.body.getReader()

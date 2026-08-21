@@ -46,6 +46,7 @@ async def _user_brief(db: AsyncSession, user: User) -> dict:
             await db.execute(select(Student).where(Student.user_id == user.id))
         ).scalar_one_or_none()
         brief["student_no"] = student.student_no if student else None
+        brief["grade"] = student.grade if student else None
     return brief
 
 

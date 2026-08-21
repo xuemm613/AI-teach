@@ -12,6 +12,8 @@ class ExerciseGenRequest(BaseModel):
     difficulty: str = Field(default="medium", pattern="^(easy|medium|hard)$")
     course_id: Optional[int] = None
     subject: Optional[str] = None   # 题目所属科目（用于保证题库科目正确对应）
+    exclude_contents: Optional[List[str]] = Field(default=None, max_length=12)
+    force_vary: bool = False  # 强制换一种不同表述，用于"再出一题"去重
 
 
 class AnalyzeErrorRequest(BaseModel):

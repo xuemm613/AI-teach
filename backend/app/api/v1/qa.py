@@ -66,6 +66,23 @@ QA_SYSTEM_PROMPT = """你是一个严谨耐心的教育智能问答助手，请�
 """
 
 
+def _build_system_prompt(payload: AskRequest) -> str:
+    """根据请求参数构建系统提示词，注入学情分析上下文。"""
+    prompt = QA_SYSTEM_PROMPT
+    if payload.context_from == 'analysis':
+        ctx_parts = []
+        if payload.stage_name or payload.stage_content:
+            stage = payload.stage_name or ''
+            content = payload.stage_content or ''
+            ctx_parts.append(f"学生当前处于「{stage}」{f'阶段，目标内容：{content}' if content else ''}阶段。")
+        if payload.weak_points:
+            ctx_parts.append(f"该学生的薄弱点诊断：{payload.weak_points}")
+        if ctx_parts:
+            ctx = ''.join(ctx_parts)
+            prompt += f"\n\n【学情上下文】\n{ctx}\n请结合以上学情信息，给出更有针对性的回答。"
+    return prompt
+
+
 @router.post("/ask-stream")
 async def ask_stream(
     payload: AskRequest,
@@ -86,7 +103,7 @@ async def ask_stream(
         if session is None or session.user_id != user.id:
             raise HTTPException(status_code=404, detail="会话不存在")
 
-    messages = [{"role": "system", "content": QA_SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": _build_system_prompt(payload)}]
     for item in payload.history:
         role = "user" if item.role == "user" else "assistant"
         messages.append({"role": role, "content": item.content})

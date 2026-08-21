@@ -89,6 +89,26 @@ EXERCISE_GENERATION_PROMPT = """你是出题专家，请围绕知识点生成一
 【难度】{difficulty}
 """
 
+
+SIMILAR_EXERCISE_PROMPT = """你是出题专家。请依据给出的"原题"，生成一道【高度相似】的变式练习题：
+要求保持与原题一致的【知识点】、【难度】、【题型结构】（选项形式/填空形式保持一致），
+仅更换具体数据、场景或表述，避免与原题重复雷同。
+输出【严格 JSON 对象】：
+{{
+  "content": "变式题目内容",
+  "options": [{{"key": "A", "text": "选项A"}}, {{"key": "B", "text": "选项B"}}, {{"key": "C", "text": "选项C"}}, {{"key": "D", "text": "选项D"}}],
+  "answer": "正确答案（如 A）",
+  "analysis": "答案解析",
+  "knowledge_point": "与原题一致或紧紧归属于原题知识点的知识点",
+  "difficulty": "与原题一致（easy/medium/hard）",
+  "quality": "置信度（high/medium/low）"
+}}
+选择题给 4 个选项；若原题为填空题/问答题，options 为空数组，answer 填参考答案文本。
+
+【原题】
+{original}
+"""
+
 SQL_AGENT_PROMPT = """你是教学数据查询助手。根据用户自然语言问题，生成一条【只读 SELECT】SQL 查询语句。
 数据库表结构如下：
 - users(id, username, full_name, role, is_active)

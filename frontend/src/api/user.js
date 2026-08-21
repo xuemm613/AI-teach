@@ -6,15 +6,21 @@ export const uploadAvatar = (formData) =>
 export const getMyCourses = () => request.get('/users/me/courses').then((r) => r.data)
 export const getMyRecords = (params) => request.get('/users/me/records', { params }).then((r) => r.data)
 export const submitRecord = (data) => request.post('/users/me/records', data).then((r) => r.data)
-export const getMyStats = () => request.get('/users/me/stats').then((r) => r.data)
+export const getMyStats = (subject = '') => request.get('/users/me/stats', { params: { subject: subject || undefined } }).then((r) => r.data)
+export const getMyActivity = (period = 'day', subject = '') =>
+  request.get('/users/me/activity', { params: { period, subject: subject || undefined } }).then((r) => r.data)
 export const getWrongBook = (params) => request.get('/users/me/wrong-book', { params }).then((r) => r.data)
 export const addWrongBook = (data) => request.post('/users/me/wrong-book', data).then((r) => r.data)
 export const deleteWrongBook = (id) => request.delete(`/users/me/wrong-book/${id}`).then((r) => r.data)
+export const batchDeleteWrongBook = (ids) => request.post('/users/me/wrong-book/batch-delete', ids).then((r) => r.data)
 export const getExercises = (params) => request.get('/users/me/exercises', { params }).then((r) => r.data)
+export const getSimilarExercises = (exerciseId, limit = 3) =>
+  request.get('/users/me/similar-exercises', { params: { exercise_id: exerciseId, limit } }).then((r) => r.data)
 
 // ---- 学生端 ----
 export const getDashboard = () => request.get('/users/me/dashboard').then((r) => r.data)
 export const getTodaySchedule = () => request.get('/users/me/today-schedule').then((r) => r.data)
+export const getWeekSchedule = () => request.get('/users/me/week-schedule').then((r) => r.data)
 export const getTimeline = (params) => request.get('/users/me/timeline', { params }).then((r) => r.data)
 export const getClassInfo = () => request.get('/users/me/class-info').then((r) => r.data)
 
